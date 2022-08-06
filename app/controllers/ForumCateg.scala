@@ -2,6 +2,8 @@ package controllers
 
 import lila.app._
 import views._
+import lila.common.config
+import lila.team.Team
 
 final class ForumCateg(env: Env) extends LilaController(env) with ForumController {
 
@@ -10,9 +12,12 @@ final class ForumCateg(env: Env) extends LilaController(env) with ForumControlle
       pageHit
       NotForKids {
         for {
-          teamIds <- ctx.userId ?? teamCache.teamIdsList
-          categs  <- postApi.categsForUser(teamIds, ctx.me)
-          _       <- env.user.lightUserApi preloadMany categs.flatMap(_.lastPostUserId)
+          allTeamIds <- ctx.userId ?? teamCache.teamIdsList
+          teamIds <- lila.common.Future.filter(allTeamIds) {
+            teamCache.forumAccess.get(_).map(_ != Team.Access.NONE)
+          }
+          categs <- postApi.categsForUser(teamIds, ctx.me)
+          _      <- env.user.lightUserApi preloadMany categs.flatMap(_.lastPostUserId)
         } yield html.forum.categ.index(categs)
       }
     }
@@ -20,7 +25,7 @@ final class ForumCateg(env: Env) extends LilaController(env) with ForumControlle
   def show(slug: String, page: Int) =
     Open { implicit ctx =>
       NotForKids {
-        Reasonable(page, 50, errorPage = notFound) {
+        Reasonable(page, config.Max(50), notFound) {
           OptionFuResult(categApi.show(slug, ctx.me, page)) { case (categ, topics) =>
             for {
               canRead     <- access.isGrantedRead(categ.slug)

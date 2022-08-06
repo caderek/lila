@@ -92,7 +92,8 @@ final class User(
       }
 
   def download(username: String) = OpenBody { implicit ctx =>
-    OptionOk(env.user.repo named username) { user =>
+    val userOption = if (username == "me") fuccess(ctx.me) else env.user.repo named username
+    OptionOk(userOption.dmap(_.filter(u => u.enabled || ctx.is(u) || isGranted(_.GamesModView)))) { user =>
       html.user.download(user)
     }
   }
@@ -129,13 +130,12 @@ final class User(
                 }
                 res <-
                   if (HTTPRequest isSynchronousHttp ctx.req) for {
-                    info   <- env.userInfo(u, nbs, ctx)
+                    info   <- env.userInfo(u, nbs, ctx, withUblog = false)
                     _      <- env.team.cached.nameCache preloadMany info.teamIds
                     social <- env.socialInfo(u, ctx)
-                    searchForm =
-                      (filters.current == GameFilter.Search) option
-                        GameFilterMenu
-                          .searchForm(userGameSearch, filters.current)(ctx.body, formBinding, reqLang)
+                    searchForm = (filters.current == GameFilter.Search) option
+                      GameFilterMenu
+                        .searchForm(userGameSearch, filters.current)(ctx.body, formBinding, reqLang)
                   } yield html.user.show.page.games(u, info, pag, filters, searchForm, social, notes)
                   else fuccess(html.user.show.gamesContent(u, nbs, pag, filters, filter, notes))
               } yield res,
@@ -399,7 +399,10 @@ final class User(
 
         val prefs = isGranted(_.CheatHunter) ?? env.pref.api.getPref(user).map(view.prefs(user))
 
-        val rageSit = isGranted(_.CheatHunter) ?? env.playban.api.getRageSit(user.id).map(view.showRageSit)
+        val rageSit = isGranted(_.CheatHunter) ?? env.playban.api
+          .getRageSit(user.id)
+          .zip(env.playban.api.bans(user.id))
+          .map { case (r, p) => view.showRageSitAndPlaybans(r, p) }
 
         val actions = env.user.repo.isErased(user) map { erased =>
           html.user.mod.actions(user, emails, erased, env.mod.presets.getPmPresets(holder.user))
@@ -610,12 +613,18 @@ final class User(
       }
     }
 
-  def ratingDistribution(perfKey: lila.rating.Perf.Key) =
+  def ratingDistribution(perfKey: lila.rating.Perf.Key, username: Option[String] = None) =
     Open { implicit ctx =>
       lila.rating.PerfType(perfKey).filter(lila.rating.PerfType.leaderboardable.has) match {
         case Some(perfType) =>
-          env.user.rankingApi.weeklyRatingDistribution(perfType) dmap { data =>
-            Ok(html.stat.ratingDistribution(perfType, data))
+          env.user.rankingApi.weeklyRatingDistribution(perfType) flatMap { data =>
+            username match {
+              case Some(name) =>
+                EnabledUser(name) { u =>
+                  fuccess(html.stat.ratingDistribution(perfType, data, Some(u)))
+                }
+              case _ => fuccess(html.stat.ratingDistribution(perfType, data, None))
+            }
           }
         case _ => notFound
       }

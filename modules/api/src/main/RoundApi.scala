@@ -8,6 +8,7 @@ import lila.analyse.{ Analysis, JsonView => analysisJson }
 import lila.common.ApiVersion
 import lila.game.{ Game, Pov }
 import lila.pref.Pref
+import lila.puzzle.PuzzleOpening
 import lila.round.JsonView.WithFlags
 import lila.round.{ Forecast, JsonView }
 import lila.security.Granter
@@ -16,6 +17,7 @@ import lila.swiss.{ GameView => SwissView }
 import lila.tournament.{ GameView => TourView }
 import lila.tree.Node.partitionTreeJsonWriter
 import lila.user.User
+import lila.common.Preload
 
 final private[api] class RoundApi(
     jsonView: JsonView,
@@ -26,6 +28,7 @@ final private[api] class RoundApi(
     tourApi: lila.tournament.TournamentApi,
     swissApi: lila.swiss.SwissApi,
     simulApi: lila.simul.SimulApi,
+    puzzleOpeningApi: lila.puzzle.PuzzleOpeningApi,
     getTeamName: lila.team.GetTeamName,
     getLightUser: lila.common.LightUser.GetterSync
 )(implicit ec: scala.concurrent.ExecutionContext) {
@@ -129,9 +132,10 @@ final private[api] class RoundApi(
       ctx.userId.ifTrue(ctx.isMobileApi).?? {
         noteApi.get(pov.gameId, _)
       } zip
-      (owner.??(forecastApi loadForDisplay pov)) zip
+      owner.??(forecastApi loadForDisplay pov) zip
+      withFlags.puzzles.??(pov.game.opening.map(_.opening)).??(puzzleOpeningApi.getClosestTo) zip
       bookmarkApi.exists(pov.game, ctx.me) map {
-        case ((((((json, tour), simul), swiss), note), fco), bookmarked) =>
+        case (((((((json, tour), simul), swiss), note), fco), puzzleOpening), bookmarked) =>
           (
             withTournament(pov, tour) _ compose
               withSwiss(swiss) compose
@@ -140,38 +144,12 @@ final private[api] class RoundApi(
               withBookmark(bookmarked) compose
               withTree(pov, analysis, initialFen, withFlags) compose
               withAnalysis(pov.game, analysis) compose
-              withForecast(pov, owner, fco)
+              withForecast(pov, owner, fco) compose
+              withPuzzleOpening(puzzleOpening)
           )(json)
       }
   }
     .mon(_.round.api.watcher)
-
-  def embed(
-      pov: Pov,
-      apiVersion: ApiVersion,
-      analysis: Option[Analysis] = None,
-      initialFenO: Option[Option[FEN]] = None,
-      withFlags: WithFlags
-  ): Fu[JsObject] =
-    initialFenO
-      .fold(gameRepo initialFen pov.game)(fuccess)
-      .flatMap { initialFen =>
-        jsonView.watcherJson(
-          pov,
-          Pref.default,
-          apiVersion,
-          none,
-          none,
-          initialFen = initialFen,
-          withFlags = withFlags
-        ) map { json =>
-          (
-            withTree(pov, analysis, initialFen, withFlags) _ compose
-              withAnalysis(pov.game, analysis)
-          )(json)
-        }
-      }
-      .mon(_.round.api.embed)
 
   def userAnalysisJson(
       pov: Pov,
@@ -184,7 +162,14 @@ final private[api] class RoundApi(
     owner.??(forecastApi loadForDisplay pov).map { fco =>
       withForecast(pov, owner, fco) {
         withTree(pov, analysis = none, initialFen, WithFlags(opening = true)) {
-          jsonView.userAnalysisJson(pov, pref, initialFen, orientation, owner = owner, me = me)
+          jsonView.userAnalysisJson(
+            pov,
+            pref,
+            initialFen,
+            orientation,
+            owner = owner,
+            me = me
+          )
         }
       }
     }
@@ -225,6 +210,20 @@ final private[api] class RoundApi(
     count.filter(0 !=).fold(json) { c =>
       json + ("forecastCount" -> JsNumber(c))
     }
+
+  private def withPuzzleOpening(
+      opening: Option[Either[PuzzleOpening.FamilyWithCount, PuzzleOpening.WithCount]]
+  )(json: JsObject) =
+    json.add(
+      "puzzle" -> opening
+        .map {
+          case Left(p)  => (p.family.key.toString, p.family.name.value, p.count)
+          case Right(p) => (p.opening.key.toString, p.opening.name.value, p.count)
+        }
+        .map { case (key, name, count) =>
+          Json.obj("key" -> key, "name" -> name, "count" -> count)
+        }
+    )
 
   private def withForecast(pov: Pov, owner: Boolean, fco: Option[Forecast])(json: JsObject) =
     if (pov.game.forecastable && owner)

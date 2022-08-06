@@ -1,22 +1,21 @@
 package lila.tournament
 
-import akka.actor._
 import akka.stream.scaladsl._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
-import lila.common.{ AtMost, Every, LilaStream, ResilientScheduler }
+import lila.common.{ LilaScheduler, LilaStream }
 
 final private class StartedOrganizer(
     api: TournamentApi,
     tournamentRepo: TournamentRepo,
     playerRepo: PlayerRepo,
     socket: TournamentSocket
-)(implicit ec: ExecutionContext, system: ActorSystem, mat: akka.stream.Materializer) {
+)(implicit ec: ExecutionContext, scheduler: akka.actor.Scheduler, mat: akka.stream.Materializer) {
 
   var runCounter = 0
 
-  ResilientScheduler(every = Every(1 seconds), timeout = AtMost(30 seconds), initialDelay = 26 seconds) {
+  LilaScheduler(_.Every(1 seconds), _.AtMost(30 seconds), _.Delay(26 seconds)) {
 
     val doAllTournaments = runCounter % 20 == 0
 

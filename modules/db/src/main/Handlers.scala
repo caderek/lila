@@ -1,15 +1,17 @@
 package lila.db
 
 import cats.data.NonEmptyList
+import chess.format.FEN
+import chess.opening.OpeningFamily
+import chess.variant.Variant
 import org.joda.time.DateTime
 import reactivemongo.api.bson._
 import reactivemongo.api.bson.exceptions.TypeDoesNotMatchException
+import scala.concurrent.duration._
 import scala.util.{ Failure, Success, Try }
 
 import lila.common.Iso._
 import lila.common.{ EmailAddress, IpAddress, Iso, NormalizedEmailAddress }
-import chess.format.FEN
-import chess.variant.Variant
 
 trait Handlers {
 
@@ -43,6 +45,16 @@ trait Handlers {
     BSONDoubleHandler.as[A](iso.from, iso.to)
   def doubleAnyValHandler[A](to: A => Double, from: Double => A): BSONHandler[A] =
     doubleIsoHandler(Iso(from, to))
+  def doubleAsIntHandler[A](to: A => Double, from: Double => A, multiplier: Int): BSONHandler[A] =
+    intAnyValHandler[A](x => Math.round(to(x) * multiplier).toInt, x => from(x.toDouble / multiplier))
+
+  val percentBsonMultiplier = 1000
+  val ratioBsonMultiplier   = 100_000
+
+  def percentAsIntHandler[A](to: A => Double, from: Double => A): BSONHandler[A] =
+    doubleAsIntHandler(to, from, percentBsonMultiplier)
+  def ratioAsIntHandler[A](to: A => Double, from: Double => A): BSONHandler[A] =
+    doubleAsIntHandler(to, from, ratioBsonMultiplier)
 
   def floatIsoHandler[A](implicit iso: FloatIso[A]): BSONHandler[A] =
     BSONFloatHandler.as[A](iso.from, iso.to)
@@ -123,10 +135,29 @@ trait Handlers {
     isoHandler[NormalizedEmailAddress, String](normalizedEmailAddressIso)
 
   implicit val colorBoolHandler = BSONBooleanHandler.as[chess.Color](chess.Color.fromWhite, _.white)
+  implicit val centisIntHandler: BSONHandler[chess.Centis] = intIsoHandler(Iso.centisIso)
 
   implicit val FENHandler: BSONHandler[FEN] = stringAnyValHandler[FEN](_.value, FEN.apply)
 
+  import lila.common.{ LilaOpening, LilaOpeningFamily }
+  implicit val OpeningKeyBSONHandler: BSONHandler[LilaOpening.Key] = stringIsoHandler(
+    LilaOpening.keyIso
+  )
+  implicit val LilaOpeningHandler = tryHandler[LilaOpening](
+    { case BSONString(key) => LilaOpening find key toTry s"No such opening: $key" },
+    o => BSONString(o.key.value)
+  )
+  implicit val LilaOpeningFamilyHandler = tryHandler[LilaOpeningFamily](
+    { case BSONString(key) => LilaOpeningFamily find key toTry s"No such opening family: $key" },
+    o => BSONString(o.key.value)
+  )
+
   implicit val modeHandler = BSONBooleanHandler.as[chess.Mode](chess.Mode.apply, _.rated)
+
+  implicit val markdownHandler: BSONHandler[lila.common.Markdown] =
+    stringAnyValHandler(_.value, lila.common.Markdown.apply)
+
+  val minutesHandler = BSONIntegerHandler.as[FiniteDuration](_.minutes, _.toMinutes.toInt)
 
   val variantByKeyHandler: BSONHandler[Variant] = quickHandler[Variant](
     {
@@ -149,4 +180,13 @@ trait Handlers {
         "increment" -> c.incrementSeconds
       )
   )
+
+  def valueMapHandler[K, V](mapping: Map[K, V])(toKey: V => K)(implicit
+      keyHandler: BSONHandler[K]
+  ) = new BSONHandler[V] {
+    def readTry(bson: BSONValue) = keyHandler.readTry(bson) flatMap { k =>
+      mapping.get(k) toTry s"No such value in mapping: $k"
+    }
+    def writeTry(v: V) = keyHandler writeTry toKey(v)
+  }
 }

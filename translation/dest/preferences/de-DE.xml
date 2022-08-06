@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="preferences">Einstellungen</string>
-  <string name="gameDisplay">Spieldarstellung</string>
+  <string name="display">Anzeige</string>
+  <string name="privacy">Privatsphäre</string>
   <string name="pieceAnimation">Figurenanimation</string>
   <string name="materialDifference">Materialunterschied</string>
   <string name="boardHighlights">Markierungen auf dem Brett (letzter Zug und Schach)</string>
@@ -35,7 +36,7 @@
   <string name="explainPromoteToQueenAutomatically">Halte die &lt;ctrl&gt; Taste während der Umwandlung um vorübergehend die automatische Umwandlung zu deaktivieren</string>
   <string name="whenPremoving">Bei Vorauszug</string>
   <string name="claimDrawOnThreefoldRepetitionAutomatically">Reklamiere automatisch Remis bei dreifacher Stellungswiederholung</string>
-  <string name="whenTimeRemainingLessThanThirtySeconds">Wenn Restzeit &lt; 30 Sekunden</string>
+  <string name="whenTimeRemainingLessThanThirtySeconds" comment="whenTimeRemainingLessThanThirtySeconds&#10;&amp;lt; becomes &lt;.&#10;The &amp;lt; symbol is not required (you can write it as 'less than' in words), just do NOT use &lt; in its place.">Wenn Restzeit &lt; 30 Sekunden</string>
   <string name="moveConfirmation">Zugbestätigung</string>
   <string name="inCorrespondenceGames">Im Fernschach</string>
   <string name="correspondenceAndUnlimited">Fernschach und unbegrenzt</string>

@@ -87,5 +87,11 @@ lichess.studyTourChapter = function (study) {
       tour.addStep(s.title, s);
     });
     tour.start();
+
+    lichess.pubsub.on('analyse.close-all', tour.cancel);
+
+    Shepherd.once('inactive', _ => {
+      lichess.pubsub.off('analyse.close-all', tour.cancel);
+    });
   });
 };

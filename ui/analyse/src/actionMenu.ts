@@ -3,7 +3,7 @@ import modal from 'common/modal';
 import { bind, bindNonPassive, dataIcon, MaybeVNodes } from 'common/snabbdom';
 import { h, VNode, Hooks } from 'snabbdom';
 import { AutoplayDelay } from './autoplay';
-import { boolSetting, BoolSetting } from './boolSetting';
+import { toggle, ToggleSettings } from 'common/toggle';
 import AnalyseCtrl from './ctrl';
 import { cont as contRoute } from 'game/router';
 import * as pgnExport from './pgnExport';
@@ -33,6 +33,8 @@ const cplSpeed: AutoplaySpeed = {
   name: 'byCPL',
   delay: 'cpl',
 };
+
+const ctrlToggle = (t: ToggleSettings, ctrl: AnalyseCtrl) => toggle(t, ctrl.trans, ctrl.redraw);
 
 function deleteButton(ctrl: AnalyseCtrl, userId?: string): VNode | undefined {
   const g = ctrl.data.game;
@@ -99,24 +101,17 @@ function rangeConfig(read: () => number, write: (value: number) => void): Hooks 
   };
 }
 
-function formatHashSize(v: number): string {
-  if (v < 1000) return v + 'MB';
-  else return Math.round(v / 1024) + 'GB';
-}
+const formatHashSize = (v: number): string => (v < 1000 ? v + 'MB' : Math.round(v / 1024) + 'GB');
 
-function hiddenInput(name: string, value: string) {
-  return h('input', {
-    attrs: { type: 'hidden', name, value },
-  });
-}
+const hiddenInput = (name: string, value: string) => h('input', { attrs: { type: 'hidden', name, value } });
 
-function studyButton(ctrl: AnalyseCtrl) {
+export function studyButton(ctrl: AnalyseCtrl) {
   if (ctrl.study && ctrl.embed && !ctrl.ongoing)
     return h(
       'a.button.button-empty',
       {
         attrs: {
-          href: '/study/' + ctrl.study.data.id + '#' + ctrl.study.currentChapter().id,
+          href: `/study/${ctrl.study.data.id}#${ctrl.study.currentChapter().id}`,
           target: '_blank',
           rel: 'noopener',
           'data-icon': '',
@@ -139,7 +134,7 @@ function studyButton(ctrl: AnalyseCtrl) {
     },
     [
       !ctrl.synthetic ? hiddenInput('gameId', ctrl.data.game.id) : hiddenInput('pgn', ''),
-      hiddenInput('orientation', ctrl.chessground.state.orientation),
+      hiddenInput('orientation', ctrl.bottomColor()),
       hiddenInput('variant', ctrl.data.game.variant.key),
       hiddenInput('fen', ctrl.tree.root.fen),
       h(
@@ -176,7 +171,10 @@ export function view(ctrl: AnalyseCtrl): VNode {
         'a.button.button-empty',
         {
           hook: bind('click', ctrl.flip),
-          attrs: dataIcon(''),
+          attrs: {
+            'data-icon': '',
+            title: 'Hotkey: f',
+          },
         },
         noarg('flipBoard')
       ),
@@ -187,8 +185,13 @@ export function view(ctrl: AnalyseCtrl): VNode {
             {
               attrs: {
                 href: d.userAnalysis
-                  ? '/editor?' + new URLSearchParams({ fen: ctrl.node.fen, variant: d.game.variant.key })
-                  : '/' + d.game.id + '/edit?fen=' + ctrl.node.fen,
+                  ? '/editor?' +
+                    new URLSearchParams({
+                      fen: ctrl.node.fen,
+                      variant: d.game.variant.key,
+                      color: ctrl.chessground.state.orientation,
+                    })
+                  : `/${d.game.id}/edit?fen=${ctrl.node.fen}`,
                 'data-icon': '',
                 ...(ctrl.embed
                   ? {
@@ -220,13 +223,13 @@ export function view(ctrl: AnalyseCtrl): VNode {
     ]),
   ];
 
-  const notSupported = 'Browser does not support this option';
+  const notSupported = (ceval?.technology == 'external' ? 'Engine' : 'Browser') + ' does not support this option';
 
   const cevalConfig: MaybeVNodes =
     ceval && ceval.possible && ceval.allowed()
       ? ([h('h2', noarg('computerAnalysis'))] as MaybeVNodes)
           .concat([
-            ctrlBoolSetting(
+            ctrlToggle(
               {
                 name: 'enable',
                 title: (mandatoryCeval ? 'Required by practice mode' : 'Stockfish') + ' (Hotkey: z)',
@@ -241,7 +244,7 @@ export function view(ctrl: AnalyseCtrl): VNode {
           .concat(
             ctrl.showComputer()
               ? [
-                  ctrlBoolSetting(
+                  ctrlToggle(
                     {
                       name: 'bestMoveArrow',
                       title: 'Hotkey: a',
@@ -251,7 +254,7 @@ export function view(ctrl: AnalyseCtrl): VNode {
                     },
                     ctrl
                   ),
-                  ctrlBoolSetting(
+                  ctrlToggle(
                     {
                       name: 'evaluationGauge',
                       id: 'gauge',
@@ -260,7 +263,7 @@ export function view(ctrl: AnalyseCtrl): VNode {
                     },
                     ctrl
                   ),
-                  ctrlBoolSetting(
+                  ctrlToggle(
                     {
                       name: 'Annotations on board',
                       title: 'Display analysis symbols on the board',
@@ -270,7 +273,7 @@ export function view(ctrl: AnalyseCtrl): VNode {
                     },
                     ctrl
                   ),
-                  ctrlBoolSetting(
+                  ctrlToggle(
                     {
                       name: 'infiniteAnalysis',
                       title: 'removesTheDepthLimit',
@@ -280,19 +283,21 @@ export function view(ctrl: AnalyseCtrl): VNode {
                     },
                     ctrl
                   ),
-                  ctrlBoolSetting(
-                    {
-                      name: 'Use NNUE',
-                      title: ceval.supportsNnue
-                        ? 'Downloads 6 MB neural network evaluation file (page reload required after change)'
-                        : notSupported,
-                      id: 'enable-nnue',
-                      checked: ceval.supportsNnue && ceval.enableNnue(),
-                      change: ceval.enableNnue,
-                      disabled: !ceval.supportsNnue,
-                    },
-                    ctrl
-                  ),
+                  ceval.technology != 'external'
+                    ? ctrlToggle(
+                        {
+                          name: 'Use NNUE',
+                          title: ceval.supportsNnue
+                            ? 'Downloads 6 MB neural network evaluation file (page reload required after change)'
+                            : notSupported,
+                          id: 'enable-nnue',
+                          checked: ceval.supportsNnue && ceval.enableNnue(),
+                          change: ceval.enableNnue,
+                          disabled: !ceval.supportsNnue,
+                        },
+                        ctrl
+                      )
+                    : null,
                   (id => {
                     const max = 5;
                     return h('div.setting', [
@@ -304,7 +309,7 @@ export function view(ctrl: AnalyseCtrl): VNode {
                           max,
                           step: 1,
                         },
-                        hook: rangeConfig(() => parseInt(ceval!.multiPv()), ctrl.cevalSetMultiPv),
+                        hook: rangeConfig(() => ceval!.multiPv(), ctrl.cevalSetMultiPv),
                       }),
                       h('div.range_value', ceval.multiPv() + ' / ' + max),
                     ]);
@@ -318,10 +323,10 @@ export function view(ctrl: AnalyseCtrl): VNode {
                           min: 1,
                           max: ceval.maxThreads,
                           step: 1,
-                          disabled: !ceval.threads,
-                          ...(ceval.threads ? null : { title: notSupported }),
+                          disabled: ceval.maxThreads <= 1,
+                          ...(ceval.maxThreads <= 1 ? { title: notSupported } : null),
                         },
-                        hook: rangeConfig(() => (ceval.threads ? parseInt(ceval.threads()) : 1), ctrl.cevalSetThreads),
+                        hook: rangeConfig(() => ceval.threads(), ctrl.cevalSetThreads),
                       }),
                       h('div.range_value', `${ceval.threads ? ceval.threads() : 1} / ${ceval.maxThreads}`),
                     ]);
@@ -335,23 +340,43 @@ export function view(ctrl: AnalyseCtrl): VNode {
                           min: 4,
                           max: Math.floor(Math.log2(ceval.maxHashSize)),
                           step: 1,
-                          disabled: !ceval.hashSize,
-                          ...(ceval.hashSize ? null : { title: notSupported }),
+                          disabled: ceval.maxHashSize <= 16,
+                          ...(ceval.maxHashSize <= 16 ? { title: notSupported } : null),
                         },
                         hook: rangeConfig(
-                          () => Math.floor(Math.log2(ceval.hashSize ? parseInt(ceval.hashSize()) : 16)),
+                          () => Math.floor(Math.log2(ceval.hashSize())),
                           v => ctrl.cevalSetHashSize(Math.pow(2, v))
                         ),
                       }),
-                      h('div.range_value', formatHashSize(ceval.hashSize ? parseInt(ceval.hashSize()) : 16)),
+                      h('div.range_value', formatHashSize(ceval.hashSize())),
                     ]))('analyse-memory'),
+                  ceval.technology == 'external'
+                    ? h('div.setting', [
+                        h('label', 'External engine'),
+                        h(
+                          'button.button.text.button-thin.button-red',
+                          {
+                            attrs: {
+                              'data-icon': '',
+                            },
+                            hook: bindNonPassive('click', () => {
+                              if (confirm('Disconnect external engine and reload?')) {
+                                ceval.disconnectExternalEngine();
+                                lichess.reload();
+                              }
+                            }),
+                          },
+                          'Disconnect'
+                        ),
+                      ])
+                    : null,
                 ]
               : []
           )
       : [];
 
   const notationConfig = [
-    ctrlBoolSetting(
+    ctrlToggle(
       {
         name: noarg('inlineNotation'),
         title: 'Shift+I',
@@ -404,8 +429,4 @@ export function view(ctrl: AnalyseCtrl): VNode {
           : null,
       ])
   );
-}
-
-function ctrlBoolSetting(o: BoolSetting, ctrl: AnalyseCtrl) {
-  return boolSetting(o, ctrl.trans, ctrl.redraw);
 }

@@ -13,6 +13,7 @@
   <string name="specialMoves">Erilised käigud</string>
   <string name="didYouLikeThisPuzzle">Kas sulle meeldis see pusle?</string>
   <string name="voteToLoadNextOne">Hääleta, nii saad edasi!</string>
+  <string name="yourPuzzleRatingWillNotChange">Teie pusle reiting ei muutu. Pidage meeles, et pusled ei ole võistlus. Teie reiting aitab valida kõige sobilikumad pusled olenevalt teie oskustele.</string>
   <string name="findTheBestMoveForWhite">Leia parim käik valgele.</string>
   <string name="findTheBestMoveForBlack">Leia parim käik mustale.</string>
   <string name="toGetPersonalizedPuzzles">Saa personaalseid puslesid:</string>
@@ -52,5 +53,5 @@
   <string name="fromMyGames">Minu mängudest</string>
   <string name="fromXGames">Pusled %s mängudest</string>
   <string name="searchPuzzles">Otsi puslesid</string>
-  <string name="fromXGamesFound">%1$s puslet leitud %2$s mängudes</string>
+  <string name="fromXGamesFound" comment="fromXGamesFound&#10;&#10;The first variable is a number, and the second is a link to a user's profile (e.g. 2 puzzles found in &lt;username&gt; games)&#10;&#10;All games on Lichess are generated from players' games.">%1$s puslet leitud %2$s mängudes</string>
 </resources>

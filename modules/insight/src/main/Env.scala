@@ -17,7 +17,8 @@ final class Env(
     mongo: lila.db.Env
 )(implicit
     ec: scala.concurrent.ExecutionContext,
-    system: akka.actor.ActorSystem
+    scheduler: akka.actor.Scheduler,
+    mat: akka.stream.Materializer
 ) {
 
   lazy val db = mongo
@@ -31,7 +32,7 @@ final class Env(
 
   lazy val jsonView = wire[JsonView]
 
-  private lazy val storage = new Storage(db(CollName("insight")))
+  private lazy val storage = new InsightStorage(db(CollName("insight")))
 
   private lazy val aggregationPipeline = wire[AggregationPipeline]
 
@@ -39,7 +40,9 @@ final class Env(
 
   private lazy val indexer: InsightIndexer = wire[InsightIndexer]
 
-  private lazy val insightUserApi = new InsightUserApi(db(CollName("insight_user")))
+  lazy val insightUserApi = new InsightUserApi(db(CollName("insight_user")))
+
+  lazy val perfStatsApi = wire[InsightPerfStatsApi]
 
   lazy val api = wire[InsightApi]
 

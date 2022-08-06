@@ -3,11 +3,9 @@ package lila.round
 import akka.stream.scaladsl._
 import org.joda.time.DateTime
 import reactivemongo.akkastream.cursorProducer
-
 import scala.concurrent.duration._
 
-import lila.common.Bus
-import lila.common.LilaStream
+import lila.common.{ Bus, LilaScheduler, LilaStream }
 import lila.db.dsl._
 import lila.game.{ Game, Pov }
 
@@ -17,7 +15,8 @@ final private class CorresAlarm(
     proxyGame: Game.ID => Fu[Option[Game]]
 )(implicit
     ec: scala.concurrent.ExecutionContext,
-    system: akka.actor.ActorSystem
+    scheduler: akka.actor.Scheduler,
+    mat: akka.stream.Materializer
 ) {
 
   private case class Alarm(
@@ -28,40 +27,35 @@ final private class CorresAlarm(
 
   implicit private val AlarmHandler = reactivemongo.api.bson.Macros.handler[Alarm]
 
-  private def scheduleNext(): Unit = system.scheduler.scheduleOnce(10 seconds) { run().unit }.unit
-
-  system.scheduler.scheduleOnce(10 seconds) { scheduleNext() }
-
   Bus.subscribeFun("finishGame") { case lila.game.actorApi.FinishGame(game, _, _) =>
     if (game.hasCorrespondenceClock && !game.hasAi) coll.delete.one($id(game.id)).unit
   }
 
-  Bus.subscribeFun("moveEventCorres") {
-    case lila.hub.actorApi.round.CorresMoveEvent(move, _, _, alarmable, _) if alarmable =>
-      proxyGame(move.gameId) foreach {
-        _ foreach { game =>
-          game.bothPlayersHaveMoved ?? {
-            game.playableCorrespondenceClock ?? { clock =>
-              val remainingTime = clock remainingTime game.turnColor
-              val ringsAt       = DateTime.now.plusSeconds(remainingTime.toInt * 8 / 10)
-              coll.update
-                .one(
-                  $id(game.id),
-                  Alarm(
-                    _id = game.id,
-                    ringsAt = ringsAt,
-                    expiresAt = DateTime.now.plusSeconds(remainingTime.toInt * 2)
-                  ),
-                  upsert = true
-                )
-                .void
-            }
+  Bus.subscribeFun("moveEventCorres") { case lila.hub.actorApi.round.CorresMoveEvent(move, _, _, true, _) =>
+    proxyGame(move.gameId) foreach {
+      _ foreach { game =>
+        game.bothPlayersHaveMoved ?? {
+          game.playableCorrespondenceClock ?? { clock =>
+            val remainingTime = clock remainingTime game.turnColor
+            val ringsAt       = DateTime.now.plusSeconds(remainingTime.toInt * 8 / 10)
+            coll.update
+              .one(
+                $id(game.id),
+                Alarm(
+                  _id = game.id,
+                  ringsAt = ringsAt,
+                  expiresAt = DateTime.now.plusSeconds(remainingTime.toInt * 2)
+                ),
+                upsert = true
+              )
+              .void
           }
         }
       }
+    }
   }
 
-  private def run(): Funit =
+  LilaScheduler(_.Every(10 seconds), _.AtMost(10 seconds), _.Delay(2 minutes)) {
     coll
       .find($doc("ringsAt" $lt DateTime.now))
       .cursor[Alarm]()
@@ -78,6 +72,6 @@ final private class CorresAlarm(
       .toMat(LilaStream.sinkCount)(Keep.right)
       .run()
       .mon(_.round.alarm.time)
-      .addEffectAnyway { scheduleNext() }
       .void
+  }
 }

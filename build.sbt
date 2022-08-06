@@ -11,8 +11,8 @@ lazy val root = Project("lila", file("."))
   .settings(buildSettings)
 
 // shorter prod classpath
-scriptClasspath := Seq("*")
-maintainer := "contact@lichess.org"
+scriptClasspath             := Seq("*")
+maintainer                  := "contact@lichess.org"
 Compile / resourceDirectory := baseDirectory.value / "conf"
 
 // format: off
@@ -21,7 +21,7 @@ libraryDependencies ++= akka.bundle ++ playWs.bundle ++ Seq(
   chess, compression, scalalib, hasher,
   reactivemongo.driver, reactivemongo.kamon, maxmind, prismic, scalatags,
   kamon.core, kamon.influxdb, kamon.metrics, kamon.prometheus,
-  scaffeine, lettuce, uaparser
+  scaffeine, caffeine, lettuce, uaparser
 ) ++ {
   if (useEpoll) Seq(epoll, reactivemongo.epoll)
   else Seq.empty
@@ -39,7 +39,7 @@ lazy val modules = Seq(
   study, studySearch, fishnet, explorer, learn, plan,
   event, coach, practice, evalCache, irwin,
   activity, relay, streamer, bot, clas, swiss, storm, racer,
-  ublog
+  ublog, tutor, opening
 )
 
 lazy val moduleRefs = modules map projectToRef
@@ -61,7 +61,7 @@ lazy val i18n = smallModule("i18n",
     MessageCompiler(
       sourceDir = new File("translation/source"),
       destDir = new File("translation/dest"),
-      dbs = "site arena emails learn activity coordinates study class contact patron coach broadcast streamer tfa settings preferences team perfStat search tourname faq lag swiss puzzle puzzleTheme challenge storm ublog insight keyboardMove".split(' ').toList,
+      dbs = "site arena emails learn activity coordinates study class contact patron coach broadcast streamer tfa settings preferences team perfStat search tourname faq lag swiss puzzle puzzleTheme challenge storm ublog insight keyboardMove timeago".split(' ').toList,
       compileTo = (Compile / sourceManaged).value
     )
   }.taskValue
@@ -69,7 +69,7 @@ lazy val i18n = smallModule("i18n",
 
 lazy val puzzle = module("puzzle",
   Seq(common, memo, hub, history, db, user, rating, pref, tree, game),
-  reactivemongo.bundle
+  reactivemongo.bundle ++ specs2Bundle
 )
 
 lazy val storm = module("storm",
@@ -248,6 +248,16 @@ lazy val importer = module("importer",
 lazy val insight = module("insight",
   Seq(common, game, user, analyse, relation, pref, socket, round, security),
   Seq(scalatags) ++ reactivemongo.bundle
+)
+
+lazy val tutor = module("tutor",
+  Seq(common, game, user, analyse, round, insight),
+  specs2Bundle ++ reactivemongo.bundle
+)
+
+lazy val opening = module("opening",
+  Seq(common, memo),
+  Seq()
 )
 
 lazy val tournament = module("tournament",

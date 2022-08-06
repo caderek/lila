@@ -105,19 +105,17 @@ final class TeamRepo(val coll: Coll)(implicit ec: scala.concurrent.ExecutionCont
         Match($doc("leaders" -> userId)) -> List(
           Group(BSONNull)("ids" -> PushField("_id")),
           PipelineOperator(
-            $doc(
-              "$lookup" -> $doc(
-                "from" -> requestColl.name,
-                "as"   -> "requests",
-                "let"  -> $doc("teams" -> "$ids"),
-                "pipeline" -> $arr(
-                  $doc(
-                    "$match" -> $doc(
-                      "$expr" -> $doc(
-                        "$and" -> $arr(
-                          $doc("$in" -> $arr("$team", "$$teams")),
-                          $doc("$ne" -> $arr("$declined", true))
-                        )
+            $lookup.pipelineFull(
+              from = requestColl.name,
+              as = "requests",
+              let = $doc("teams" -> "$ids"),
+              pipe = List(
+                $doc(
+                  "$match" -> $expr(
+                    $doc(
+                      $and(
+                        $doc("$in" -> $arr("$team", "$$teams")),
+                        $doc("$ne" -> $arr("$declined", true))
                       )
                     )
                   )
@@ -134,6 +132,14 @@ final class TeamRepo(val coll: Coll)(implicit ec: scala.concurrent.ExecutionCont
 
   def forumAccess(id: Team.ID): Fu[Option[Team.Access]] =
     coll.secondaryPreferred.primitiveOne[Team.Access]($id(id), "forum")
+
+  def filterHideMembers(ids: Iterable[Team.ID]): Fu[Set[Team.ID]] =
+    ids.nonEmpty ?? coll.secondaryPreferred
+      .distinctEasy[Team.ID, Set]("_id", $inIds(ids) ++ $doc("hideMembers" -> true))
+
+  def filterHideForum(ids: Iterable[Team.ID]): Fu[Set[Team.ID]] =
+    ids.nonEmpty ?? coll.secondaryPreferred
+      .distinctEasy[Team.ID, Set]("_id", $inIds(ids) ++ $doc("forum" $ne Team.Access.EVERYONE))
 
   private[team] val enabledSelect = $doc("enabled" -> true)
 

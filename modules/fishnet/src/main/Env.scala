@@ -21,7 +21,8 @@ private class FishnetConfig(
     @ConfigName("analysis.nodes") val analysisNodes: Int,
     @ConfigName("move.plies") val movePlies: Int,
     @ConfigName("client_min_version") val clientMinVersion: String,
-    @ConfigName("redis.uri") val redisUri: String
+    @ConfigName("redis.uri") val redisUri: String,
+    val explorerEndpoint: String
 )
 
 @Module
@@ -40,7 +41,8 @@ final class Env(
     shutdown: akka.actor.CoordinatedShutdown
 )(implicit
     ec: scala.concurrent.ExecutionContext,
-    system: ActorSystem
+    system: ActorSystem,
+    scheduler: akka.actor.Scheduler
 ) {
 
   private val config = appConfig.get[FishnetConfig]("fishnet")(AutoConfig.loader)
@@ -96,8 +98,6 @@ final class Env(
   lazy val analyser = wire[Analyser]
 
   lazy val awaiter = wire[FishnetAwaiter]
-
-  lazy val aiPerfApi = wire[AiPerfApi]
 
   wire[Cleaner]
 

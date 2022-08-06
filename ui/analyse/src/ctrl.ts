@@ -4,10 +4,9 @@ import * as game from 'game';
 import * as keyboard from './keyboard';
 import * as speech from './speech';
 import * as util from './util';
-import * as xhr from 'common/xhr';
 import debounce from 'common/debounce';
 import GamebookPlayCtrl from './study/gamebook/gamebookPlayCtrl';
-import makeStudy from './study/studyCtrl';
+import type makeStudyCtrl from './study/studyCtrl';
 import throttle from 'common/throttle';
 import { AnalyseOpts, AnalyseData, ServerEvalData, Key, JustCaptured, NvuiPlugin, Redraw } from './interfaces';
 import { Api as ChessgroundApi } from 'chessground/api';
@@ -35,24 +34,27 @@ import { parseFen } from 'chessops/fen';
 import { Position, PositionError } from 'chessops/chess';
 import { Result } from '@badrap/result';
 import { setupPosition } from 'chessops/variant';
-import { storedProp, StoredBooleanProp } from 'common/storage';
+import { storedBooleanProp } from 'common/storage';
 import { AnaMove, StudyCtrl } from './study/interfaces';
 import { StudyPracticeCtrl } from './study/practice/interfaces';
 import { valid as crazyValid } from './crazy/crazyCtrl';
 import { PromotionCtrl } from 'chess/promotion';
 import wikiTheory, { WikiTheory } from './wiki';
 import ExplorerCtrl from './explorer/explorerCtrl';
+import { uciToMove } from 'chessground/util';
+import Persistence from './persistence';
+import pgnImport from './pgnImport';
 
 export default class AnalyseCtrl {
   data: AnalyseData;
   element: HTMLElement;
-
   tree: TreeWrapper;
   socket: Socket;
   chessground: ChessgroundApi;
   trans: Trans;
   ceval: CevalCtrl;
   evalCache: EvalCache;
+  persistence?: Persistence;
 
   // current tree state, cursor, and denormalized node lists
   path: Tree.Path;
@@ -87,10 +89,10 @@ export default class AnalyseCtrl {
   flipped = false;
   embed: boolean;
   showComments = true; // whether to display comments in the move tree
-  showAutoShapes: StoredBooleanProp = storedProp('show-auto-shapes', true);
-  showGauge: StoredBooleanProp = storedProp('show-gauge', true);
-  showComputer: StoredBooleanProp = storedProp('show-computer', true);
-  showMoveAnnotation: StoredBooleanProp = storedProp('show-move-annotation', true);
+  showAutoShapes = storedBooleanProp('show-auto-shapes', true);
+  showGauge = storedBooleanProp('show-gauge', true);
+  showComputer = storedBooleanProp('show-computer', true);
+  showMoveAnnotation = storedBooleanProp('show-move-annotation', true);
   keyboardHelp: boolean = location.hash === '#keyboard';
   threatMode: Prop<boolean> = prop(false);
   treeView: TreeView;
@@ -114,7 +116,7 @@ export default class AnalyseCtrl {
   nvui?: NvuiPlugin;
   pvUciQueue: Uci[] = [];
 
-  constructor(readonly opts: AnalyseOpts, readonly redraw: Redraw) {
+  constructor(readonly opts: AnalyseOpts, readonly redraw: Redraw, makeStudy?: typeof makeStudyCtrl) {
     this.data = opts.data;
     this.element = opts.element;
     this.embed = opts.embed;
@@ -125,11 +127,15 @@ export default class AnalyseCtrl {
     if (this.data.forecast) this.forecast = makeForecast(this.data.forecast, this.data, redraw);
     if (this.opts.wiki) this.wiki = wikiTheory();
 
-    if (window.LichessAnalyseNvui) this.nvui = window.LichessAnalyseNvui(redraw) as NvuiPlugin;
+    if (window.LichessAnalyseNvui) this.nvui = window.LichessAnalyseNvui(this) as NvuiPlugin;
 
     this.instanciateEvalCache();
 
+    if (opts.inlinePgn) this.data = this.changePgn(opts.inlinePgn, false) || this.data;
+
     this.initialize(this.data, false);
+
+    this.persistence = this.embed || opts.study || this.synthetic ? undefined : new Persistence(this);
 
     this.instanciateCeval();
 
@@ -137,12 +143,13 @@ export default class AnalyseCtrl {
 
     {
       const loc = window.location,
-        hashPly = loc.hash === '#last' ? this.tree.lastPly() : parseInt(loc.hash.slice(1));
-      if (hashPly) {
+        hashPly = loc.hash === '#last' ? this.tree.lastPly() : parseInt(loc.hash.slice(1)),
+        startPly = hashPly || (opts.inlinePgn && this.tree.lastPly());
+      if (startPly) {
         // remove location hash - https://stackoverflow.com/questions/1397329/how-to-remove-the-hash-from-window-location-with-javascript-without-page-refresh/5298684#5298684
         window.history.replaceState(null, '', loc.pathname + loc.search);
         const mainline = treeOps.mainlineNodeList(this.tree.root);
-        this.initialPath = treeOps.takePathWhile(mainline, n => n.ply <= hashPly);
+        this.initialPath = treeOps.takePathWhile(mainline, n => n.ply <= startPly);
       }
     }
 
@@ -153,7 +160,7 @@ export default class AnalyseCtrl {
     this.startCeval();
     this.explorer.setNode();
     this.study = opts.study
-      ? makeStudy(opts.study, this, (opts.tagTypes || '').split(','), opts.practice, opts.relay)
+      ? makeStudy?.(opts.study, this, (opts.tagTypes || '').split(','), opts.practice, opts.relay)
       : undefined;
     this.studyPractice = this.study ? this.study.practice : undefined;
 
@@ -180,8 +187,8 @@ export default class AnalyseCtrl {
       this.jumpToIndex(index);
       this.redraw();
     });
-
     speech.setup();
+    this.persistence?.merge();
   }
 
   initialize(data: AnalyseData, merge: boolean): void {
@@ -220,6 +227,7 @@ export default class AnalyseCtrl {
     this.fenInput = undefined;
     this.pgnInput = undefined;
     if (this.wiki) this.wiki(this.nodeList);
+    this.persistence?.save();
   };
 
   flip = () => {
@@ -232,6 +240,7 @@ export default class AnalyseCtrl {
     }
     if (this.practice) this.restartPractice();
     this.explorer.onFlip();
+    this.onChange();
     this.redraw();
   };
 
@@ -262,12 +271,6 @@ export default class AnalyseCtrl {
   togglePlay(delay: AutoplayDelay): void {
     this.autoplay.toggle(delay);
     this.actionMenu.open = false;
-  }
-
-  private uciToLastMove(uci?: Uci): Key[] | undefined {
-    if (!uci) return;
-    const start = uci[1] === '@' ? 2 : 0;
-    return [uci.slice(start, start + 2), uci.slice(2, 4)] as Key[];
   }
 
   private showGround(): void {
@@ -315,7 +318,7 @@ export default class AnalyseCtrl {
               dests: (movableColor === color && dests) || new Map(),
             },
         check: !!node.check,
-        lastMove: this.uciToLastMove(node.uci),
+        lastMove: uciToMove(node.uci),
       };
     if (!dests && !node.check) {
       // premove while dests are loading from server
@@ -394,6 +397,7 @@ export default class AnalyseCtrl {
       const prev = this.path;
       this.practice.preUserJump(prev, path);
       this.jump(path);
+      this.withCg(cg => cg.cancelPremove());
       this.practice.postUserJump(prev, this.path);
     } else this.jump(path);
   };
@@ -431,25 +435,24 @@ export default class AnalyseCtrl {
     this.cgVersion.js++;
   }
 
-  changePgn(pgn: string): void {
-    this.redirecting = true;
-    xhr
-      .json('/analysis/pgn', {
-        method: 'post',
-        body: xhr.form({ pgn }),
-      })
-      .then(
-        (data: AnalyseData) => {
-          this.reloadData(data, false);
-          this.userJump(this.mainlinePathToPly(this.tree.lastPly()));
-          this.redraw();
-        },
-        error => {
-          console.log(error);
-          this.redirecting = false;
-          this.redraw();
-        }
-      );
+  changePgn(pgn: string, andReload: boolean): AnalyseData | undefined {
+    try {
+      const data: AnalyseData = {
+        ...pgnImport(pgn),
+        orientation: this.bottomColor(),
+        pref: this.data.pref,
+        evalPut: this.data.evalPut,
+      } as AnalyseData;
+      if (andReload) {
+        this.reloadData(data, false);
+        this.userJump(this.mainlinePathToPly(this.tree.lastPly()));
+        this.redraw();
+      }
+      return data;
+    } catch (err) {
+      console.log(err);
+    }
+    return undefined;
   }
 
   changeFen(fen: Fen): void {
@@ -524,6 +527,7 @@ export default class AnalyseCtrl {
   };
 
   addNode(node: Tree.Node, path: Tree.Path) {
+    this.persistence?.onAddNode(node, path);
     const newPath = this.tree.addNode(node, path);
     if (!newPath) {
       console.log("Can't addNode", node, path);
@@ -672,7 +676,7 @@ export default class AnalyseCtrl {
     if (this.ceval.enabled()) {
       if (this.canUseCeval()) {
         this.ceval.start(this.path, this.nodeList, this.threatMode());
-        this.evalCache.fetch(this.path, parseInt(this.ceval.multiPv()));
+        this.evalCache.fetch(this.path, this.ceval.multiPv());
       } else this.ceval.stop();
     }
   });
@@ -723,14 +727,12 @@ export default class AnalyseCtrl {
   };
 
   cevalSetThreads = (v: number): void => {
-    if (!this.ceval.threads) return;
-    this.ceval.threads(v);
+    this.ceval.setThreads(v);
     this.cevalReset();
   };
 
   cevalSetHashSize = (v: number): void => {
-    if (!this.ceval.hashSize) return;
-    this.ceval.hashSize(v);
+    this.ceval.setHashSize(v);
     this.cevalReset();
   };
 
@@ -861,6 +863,7 @@ export default class AnalyseCtrl {
       canGet: () => this.canEvalGet(),
       canPut: () =>
         !!(
+          this.ceval?.cachable &&
           this.data.evalPut &&
           this.canEvalGet() &&
           // if not in study, only put decent opening moves
@@ -872,19 +875,28 @@ export default class AnalyseCtrl {
     });
   }
 
+  closeTools = () => {
+    if (this.retro) this.retro = undefined;
+    if (this.practice) this.togglePractice();
+    if (this.explorer.enabled()) this.toggleExplorer();
+    this.persistence?.toggleOpen(false);
+  };
+
   toggleRetro = (): void => {
     if (this.retro) this.retro = undefined;
     else {
+      this.closeTools();
       this.retro = makeRetro(this, this.bottomColor());
-      if (this.practice) this.togglePractice();
-      if (this.explorer.enabled()) this.toggleExplorer();
     }
     this.setAutoShapes();
   };
 
   toggleExplorer = (): void => {
-    if (this.practice) this.togglePractice();
-    if (this.explorer.enabled() || this.explorer.allowed()) this.explorer.toggle();
+    if (this.explorer.enabled()) this.explorer.toggle();
+    else if (this.explorer.allowed()) {
+      this.closeTools();
+      this.explorer.toggle();
+    }
   };
 
   togglePractice = () => {
@@ -892,8 +904,7 @@ export default class AnalyseCtrl {
       this.practice = undefined;
       this.showGround();
     } else {
-      if (this.retro) this.toggleRetro();
-      if (this.explorer.enabled()) this.toggleExplorer();
+      this.closeTools();
       this.practice = makePractice(this, () => {
         // push to 20 to store AI moves in the cloud
         // lower to 18 after task completion (or failure)
@@ -903,19 +914,21 @@ export default class AnalyseCtrl {
     }
   };
 
+  togglePersistence = () => {
+    const isOpen = this.persistence?.open();
+    this.closeTools();
+    this.persistence?.toggleOpen(!isOpen);
+  };
+
   restartPractice() {
     this.practice = undefined;
     this.togglePractice();
   }
 
-  gamebookPlay = (): GamebookPlayCtrl | undefined => {
-    return this.study && this.study.gamebookPlay();
-  };
+  gamebookPlay = (): GamebookPlayCtrl | undefined => this.study && this.study.gamebookPlay();
 
   isGamebook = (): boolean => !!(this.study && this.study.data.chapter.gamebook);
 
-  withCg = <A>(f: (cg: ChessgroundApi) => A): A | undefined => {
-    if (this.chessground && this.cgVersion.js === this.cgVersion.dom) return f(this.chessground);
-    return undefined;
-  };
+  withCg = <A>(f: (cg: ChessgroundApi) => A): A | undefined =>
+    this.chessground && this.cgVersion.js === this.cgVersion.dom ? f(this.chessground) : undefined;
 }

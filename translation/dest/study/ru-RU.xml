@@ -56,7 +56,7 @@
   <string name="onlyContributorsCanRequestAnalysis">Только редакторы студии могут запросить компьютерный анализ.</string>
   <string name="getAFullComputerAnalysis">Получить с сервера полный компьютерный анализ главной линии.</string>
   <string name="makeSureTheChapterIsComplete">Убедитесь, что глава завершена. Вы можете запросить анализ только один раз.</string>
-  <string name="allSyncMembersRemainOnTheSamePosition">Все синхронизированные участники остаются на той же позиции</string>
+  <string name="allSyncMembersRemainOnTheSamePosition" comment="allSyncMembersRemainOnTheSamePosition&#10;&#10;This is a help text explaining the synchronization feature. When enabled, this synchronizes members so that everyone sees the same position.">Все синхронизированные участники остаются на той же позиции</string>
   <string name="shareChanges">Поделиться изменениями со зрителями и сохранить их на сервере</string>
   <string name="playing">Активные</string>
   <string name="first">Первая</string>
@@ -82,6 +82,7 @@
   <string name="studyNotFound">Студия не найдена</string>
   <string name="editChapter">Редактировать главу</string>
   <string name="newChapter">Новая глава</string>
+  <string name="importFromChapterX">Импорт из %s</string>
   <string name="orientation">Ориентация</string>
   <string name="analysisMode">Режим анализа</string>
   <string name="pinnedChapterComment">Закреплённый комментарий главы</string>

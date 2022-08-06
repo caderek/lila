@@ -18,6 +18,14 @@ final class LilaList[A](private val list: List[A]) extends AnyVal {
       case Nil           => None
       case first :: rest => Some(NonEmptyList(first, rest))
     }
+  def tailOption: Option[List[A]] = list match {
+    case Nil       => None
+    case _ :: rest => Some(rest)
+  }
+  def tailSafe: List[A]         = tailOption getOrElse Nil
+  def indexOption(a: A)         = Option(list indexOf a).filter(0 <=)
+  def previous(a: A): Option[A] = indexOption(a).flatMap(i => list.lift(i - 1))
+  def next(a: A): Option[A]     = indexOption(a).flatMap(i => list.lift(i + 1))
 }
 
 final class LilaSeq[A](private val seq: Seq[A]) extends AnyVal {

@@ -67,6 +67,11 @@ trait dsl {
   def $not(expression: Bdoc): Bdoc = {
     $doc("$not" -> expression)
   }
+
+  def $expr(expression: Bdoc): Bdoc = {
+    $doc("$expr" -> expression)
+  }
+
   // End of Top Level Logical Operators
   // **********************************************************************************************//
 
@@ -80,9 +85,6 @@ trait dsl {
     $doc("$text" -> $doc("$search" -> term, f"$$language" -> lang))
   }
 
-  def $where(expr: String): Bdoc = {
-    $doc("$where" -> expr)
-  }
   // End of Top Level Evaluation Operators
   // **********************************************************************************************//
 
@@ -125,6 +127,13 @@ trait dsl {
 
   def $max(item: ElementProducer): Bdoc = {
     $doc("$max" -> $doc(item))
+  }
+
+  def $divide[A: BSONWriter, B: BSONWriter](a: A, b: B): Bdoc = {
+    $doc("$divide" -> $arr(a, b))
+  }
+  def $multiply[A: BSONWriter, B: BSONWriter](a: A, b: B): Bdoc = {
+    $doc("$multiply" -> $arr(a, b))
   }
 
   // Helpers
@@ -254,51 +263,44 @@ trait dsl {
   /** MongoDB comparison operators. */
   trait ComparisonOperators { self: ElementBuilder =>
 
-    def $eq[T: BSONWriter](value: T): SimpleExpression[BSONValue] = {
+    def $eq[T: BSONWriter](value: T): SimpleExpression[BSONValue] =
       SimpleExpression(field, implicitly[BSONWriter[T]].writeTry(value).get)
-    }
 
     /** Matches values that are greater than the value specified in the query. */
-    def $gt[T: BSONWriter](value: T): CompositeExpression = {
+    def $gt[T: BSONWriter](value: T): CompositeExpression =
       CompositeExpression(field, append($doc("$gt" -> value)))
-    }
 
     /** Matches values that are greater than or equal to the value specified in the query. */
-    def $gte[T: BSONWriter](value: T): CompositeExpression = {
+    def $gte[T: BSONWriter](value: T): CompositeExpression =
       CompositeExpression(field, append($doc("$gte" -> value)))
-    }
 
     /** Matches any of the values that exist in an array specified in the query. */
-    def $in[T: BSONWriter](values: Iterable[T]): SimpleExpression[Bdoc] = {
+    def $in[T: BSONWriter](values: Iterable[T]): SimpleExpression[Bdoc] =
       SimpleExpression(field, $doc("$in" -> values))
-    }
 
     /** Matches values that are less than the value specified in the query. */
-    def $lt[T: BSONWriter](value: T): CompositeExpression = {
+    def $lt[T: BSONWriter](value: T): CompositeExpression =
       CompositeExpression(field, append($doc("$lt" -> value)))
-    }
 
     /** Matches values that are less than or equal to the value specified in the query. */
-    def $lte[T: BSONWriter](value: T): CompositeExpression = {
+    def $lte[T: BSONWriter](value: T): CompositeExpression =
       CompositeExpression(field, append($doc("$lte" -> value)))
-    }
+
+    def $inRange(range: Range) =
+      CompositeExpression(field, append($doc("$gte" -> range.min, "$lte" -> range.max)))
 
     /** Matches all values that are not equal to the value specified in the query. */
-    def $ne[T: BSONWriter](value: T): SimpleExpression[Bdoc] = {
+    def $ne[T: BSONWriter](value: T): SimpleExpression[Bdoc] =
       SimpleExpression(field, $doc("$ne" -> value))
-    }
 
     /** Matches values that do not exist in an array specified to the query. */
-    def $nin[T: BSONWriter](values: Iterable[T]): SimpleExpression[Bdoc] = {
+    def $nin[T: BSONWriter](values: Iterable[T]): SimpleExpression[Bdoc] =
       SimpleExpression(field, $doc("$nin" -> values))
-    }
 
   }
 
   trait ElementOperators { self: ElementBuilder =>
-    def $exists(v: Boolean): SimpleExpression[Bdoc] = {
-      SimpleExpression(field, $doc("$exists" -> v))
-    }
+    def $exists(v: Boolean): SimpleExpression[Bdoc] = SimpleExpression(field, $doc("$exists" -> v))
   }
 
   trait EvaluationOperators { self: ElementBuilder =>
@@ -310,20 +312,19 @@ trait dsl {
 
     def $startsWith(value: String, options: String = ""): SimpleExpression[BSONRegex] =
       $regex(s"^$value", options)
+
+    def $endsWith(value: String, options: String = ""): SimpleExpression[BSONRegex] =
+      $regex(s"$value$$", options)
   }
 
   trait ArrayOperators { self: ElementBuilder =>
-    def $all[T: BSONWriter](values: Seq[T]): SimpleExpression[Bdoc] = {
+    def $all[T: BSONWriter](values: Seq[T]): SimpleExpression[Bdoc] =
       SimpleExpression(field, $doc("$all" -> values))
-    }
 
-    def $elemMatch(query: ElementProducer*): SimpleExpression[Bdoc] = {
+    def $elemMatch(query: ElementProducer*): SimpleExpression[Bdoc] =
       SimpleExpression(field, $doc("$elemMatch" -> $doc(query: _*)))
-    }
 
-    def $size(s: Int): SimpleExpression[Bdoc] = {
-      SimpleExpression(field, $doc("$size" -> s))
-    }
+    def $size(s: Int): SimpleExpression[Bdoc] = SimpleExpression(field, $doc("$size" -> s))
   }
 
   object $sort {
@@ -352,20 +353,21 @@ trait dsl {
       simple(from.name, as, local, foreign)
     def simple(from: AsyncColl, as: String, local: String, foreign: String): Bdoc =
       simple(from.name.value, as, local, foreign)
-    def pipeline(from: String, as: String, local: String, foreign: String, pipe: List[Bdoc]): Bdoc =
+    def pipelineFull(from: String, as: String, let: Bdoc, pipe: List[Bdoc]): Bdoc =
       $doc(
         "$lookup" -> $doc(
-          "from" -> from,
-          "as"   -> as,
-          "let"  -> $doc("local" -> s"$$$local"),
-          "pipeline" -> {
-            $doc(
-              "$match" -> $doc(
-                "$expr" -> $doc("$eq" -> $arr(s"$$$foreign", "$$local"))
-              )
-            ) :: pipe
-          }
+          "from"     -> from,
+          "as"       -> as,
+          "let"      -> let,
+          "pipeline" -> pipe
         )
+      )
+    def pipeline(from: String, as: String, local: String, foreign: String, pipe: List[Bdoc]): Bdoc =
+      pipelineFull(
+        from,
+        as,
+        $doc("local" -> s"$$$local"),
+        $doc("$match" -> $expr($doc("$eq" -> $arr(s"$$$foreign", "$$local")))) :: pipe
       )
     def pipeline(from: Coll, as: String, local: String, foreign: String, pipe: List[Bdoc]): Bdoc =
       pipeline(from.name, as, local, foreign, pipe)

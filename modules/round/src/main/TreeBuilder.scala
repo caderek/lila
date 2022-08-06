@@ -37,15 +37,21 @@ object TreeBuilder {
           else _ => None
         val fen                 = Forsyth >> init
         val infos: Vector[Info] = analysis.??(_.infos.toVector)
-        val advices: Map[Ply, Advice] = analysis.??(_.advices.view.map { a =>
-          a.ply -> a
-        }.toMap)
+        val advices: Map[Ply, Advice] = analysis.??(
+          _.advices.view
+            .map { a =>
+              a.ply -> a
+            }
+            .toMap
+        )
         val root = Root(
           ply = init.turns,
           fen = fen,
           check = init.situation.check,
           opening = openingOf(fen),
-          clock = withClocks.flatMap(_.headOption),
+          clock = withFlags.clocks ?? game.clock.map { c =>
+            Centis.ofSeconds(c.limitSeconds)
+          },
           crazyData = init.situation.board.crazyData,
           eval = infos lift 0 map makeEval
         )

@@ -374,6 +374,8 @@
   <string name="apply">Aplicați</string>
   <string name="save">Salvează</string>
   <string name="leaderboard">Clasament</string>
+  <string name="screenshotCurrentPosition">Captură de ecran cu poziția curentă</string>
+  <string name="gameAsGIF">Salvați jocul ca fișier GIF</string>
   <string name="pasteTheFenStringHere">Lipește textul FEN aici</string>
   <string name="pasteThePgnStringHere">Lipește textul PGN aici</string>
   <string name="orUploadPgnFile">Sau încarcă un fișier PGN</string>
@@ -457,6 +459,8 @@
   <string name="tournamentIsStarting">Turneul începe</string>
   <string name="tournamentPairingsAreNowClosed">Cuplarea partenerilor de turneu s-a încheiat.</string>
   <string name="standByX">Fii pe fază, %s, jucătorii sunt cuplați, pregătește-te!</string>
+  <string name="pause">Pauză</string>
+  <string name="resume">Continuare</string>
   <string name="youArePlaying">Te joci!</string>
   <string name="winRate">Procent de câștig</string>
   <string name="berserkRate">Procent jocuri cu timp înjumătățit</string>
@@ -491,6 +495,10 @@
   <string name="socialMediaLinks">Link-urile rețelelor de socializare</string>
   <string name="oneUrlPerLine">Un URL pe linie.</string>
   <string name="inlineNotation">Notație integrată</string>
+  <string name="savingMoves">Stocarea temporară a mutărilor</string>
+  <string name="savingMovesHelp">Întotdeauna îți stocăm variațiile în memoria cache a browser-ului.</string>
+  <string name="makeAStudy">Pentru păstrare în siguranță și partajare, aveți în vedere crearea unui studiu.</string>
+  <string name="clearSavedMoves">Șterge mutările</string>
   <string name="previouslyOnLichessTV">Anterior pe Lichess TV</string>
   <string name="onlinePlayers">Jucători conectați</string>
   <string name="activePlayers">Jucători activi</string>
@@ -597,6 +605,7 @@
   <string name="community">Comunitate</string>
   <string name="tools">Unelte</string>
   <string name="increment">Suplimentar</string>
+  <string name="error.unknown">Valoarea nu este validă</string>
   <string name="error.required">Acest camp este necesar</string>
   <string name="error.email">Această adresă de e-mail nu este validă</string>
   <string name="error.email_acceptable">Această adresă de e-mail nu este acceptată. Te rugăm să o verifici și să încerci din nou.</string>

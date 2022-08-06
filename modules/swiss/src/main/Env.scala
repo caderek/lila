@@ -5,7 +5,7 @@ import play.api.Configuration
 import scala.concurrent.duration._
 
 import lila.common.config._
-import lila.common.{ AtMost, Every, ResilientScheduler }
+import lila.common.LilaScheduler
 import lila.socket.Socket.{ GetVersion, SocketVersion }
 
 @Module
@@ -27,6 +27,7 @@ final class Env(
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     system: akka.actor.ActorSystem,
+    scheduler: akka.actor.Scheduler,
     mat: akka.stream.Materializer,
     idGenerator: lila.game.IdGenerator,
     mode: play.api.Mode
@@ -73,7 +74,7 @@ final class Env(
 
   private lazy val cache: SwissCache = wire[SwissCache]
 
-  lazy val getName = new GetSwissName(cache.name.sync)
+  lazy val getName = new GetSwissName(cache.name)
 
   private lazy val officialSchedule = wire[SwissOfficialSchedule]
 
@@ -83,31 +84,19 @@ final class Env(
     "finishGame",
     "adjustCheater",
     "adjustBooster",
-    "teamKick"
+    "teamLeave"
   ) {
-    case lila.game.actorApi.FinishGame(game, _, _)           => api.finishGame(game).unit
-    case lila.hub.actorApi.team.KickFromTeam(teamId, userId) => api.kickFromTeam(teamId, userId).unit
-    case lila.hub.actorApi.mod.MarkCheater(userId, true)     => api.kickLame(userId).unit
-    case lila.hub.actorApi.mod.MarkBooster(userId)           => api.kickLame(userId).unit
+    case lila.game.actorApi.FinishGame(game, _, _)        => api.finishGame(game).unit
+    case lila.hub.actorApi.team.LeaveTeam(teamId, userId) => api.leaveTeam(teamId, userId).unit
+    case lila.hub.actorApi.mod.MarkCheater(userId, true)  => api.kickLame(userId).unit
+    case lila.hub.actorApi.mod.MarkBooster(userId)        => api.kickLame(userId).unit
   }
 
-  ResilientScheduler(
-    every = Every(1 seconds),
-    timeout = AtMost(20 seconds),
-    initialDelay = 20 seconds
-  ) { api.startPendingRounds }
+  LilaScheduler(_.Every(1 seconds), _.AtMost(20 seconds), _.Delay(20 seconds))(api.startPendingRounds)
 
-  ResilientScheduler(
-    every = Every(10 seconds),
-    timeout = AtMost(15 seconds),
-    initialDelay = 20 seconds
-  ) { api.checkOngoingGames }
+  LilaScheduler(_.Every(10 seconds), _.AtMost(15 seconds), _.Delay(20 seconds))(api.checkOngoingGames)
 
-  ResilientScheduler(
-    every = Every(1 hour),
-    timeout = AtMost(15 seconds),
-    initialDelay = 5 minutes
-  ) { officialSchedule.generate }
+  LilaScheduler(_.Every(1 hour), _.AtMost(15 seconds), _.Delay(5 minutes))(officialSchedule.generate)
 }
 
 private class SwissColls(db: lila.db.Db) {

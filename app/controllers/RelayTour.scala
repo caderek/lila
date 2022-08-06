@@ -13,14 +13,15 @@ import lila.common.config.MaxPerSecond
 import lila.common.{ HTTPRequest, IpAddress }
 import lila.relay.{ RelayRound => RoundModel, RelayTour => TourModel }
 import lila.user.{ User => UserModel }
+import lila.common.config
 
 final class RelayTour(env: Env, apiC: => Api, prismicC: => Prismic) extends LilaController(env) {
 
   def index(page: Int) =
     Open { implicit ctx =>
-      Reasonable(page) {
+      Reasonable(page, config.Max(20)) {
         for {
-          active <- (page == 1).??(env.relay.api.officialActive)
+          active <- (page == 1).??(env.relay.api.officialActive.get({}))
           pager  <- env.relay.pager.inactive(page)
         } yield Ok(html.relay.tour.index(active, pager))
       }

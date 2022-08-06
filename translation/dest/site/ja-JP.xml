@@ -322,6 +322,8 @@
   <string name="apply">適用</string>
   <string name="save">保存</string>
   <string name="leaderboard">ランキング</string>
+  <string name="screenshotCurrentPosition">現局面のスクリーンショット</string>
+  <string name="gameAsGIF">GIF 形式の棋譜</string>
   <string name="pasteTheFenStringHere">ここにFEN形式の局面をペースト</string>
   <string name="pasteThePgnStringHere">ここにPGN形式の棋譜をペースト</string>
   <string name="orUploadPgnFile">または PGN ファイルをアップロード</string>
@@ -396,6 +398,8 @@
   <string name="tournamentIsStarting">トーナメント開始</string>
   <string name="tournamentPairingsAreNowClosed">トーナメントの対局の組み合わせは終了しました。</string>
   <string name="standByX">%s さん、現在ペアリング中です。用意して！</string>
+  <string name="pause">休む</string>
+  <string name="resume">再開する</string>
   <string name="youArePlaying">参加中！</string>
   <string name="winRate">勝率</string>
   <string name="berserkRate">バーサーク率</string>
@@ -430,6 +434,10 @@
   <string name="socialMediaLinks">ソーシャルメディアへのリンク</string>
   <string name="oneUrlPerLine">URL は 1 行に 1 個です。</string>
   <string name="inlineNotation">棋譜を行書き</string>
+  <string name="savingMoves">手の一時保存</string>
+  <string name="savingMovesHelp">あなたの指した手順は常にブラウザのキャッシュに保存されます。</string>
+  <string name="makeAStudy">永久保存や共有には「研究」機能をお使いください。</string>
+  <string name="clearSavedMoves">手をクリアする</string>
   <string name="previouslyOnLichessTV">過去の Lichess TV 対局</string>
   <string name="onlinePlayers">接続中のプレイヤー</string>
   <string name="activePlayers">総対局数上位</string>
@@ -530,6 +538,7 @@
   <string name="community">コミュニティ</string>
   <string name="tools">ツール</string>
   <string name="increment">追加時間</string>
+  <string name="error.unknown">無効な値</string>
   <string name="error.required">この欄は入力必須です</string>
   <string name="error.email">このメールアドレスは無効です</string>
   <string name="error.email_acceptable">このメールアドレスは使用できません。確認してもう一度どうぞ。</string>

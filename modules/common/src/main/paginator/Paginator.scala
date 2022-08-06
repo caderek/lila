@@ -58,6 +58,11 @@ final class Paginator[A] private[paginator] (
 
   def mapFutureResults[B](f: A => Fu[B])(implicit ec: scala.concurrent.ExecutionContext): Fu[Paginator[B]] =
     currentPageResults.map(f).sequenceFu dmap withCurrentPageResults
+
+  def mapFutureList[B](f: Seq[A] => Fu[Seq[B]])(implicit
+      ec: scala.concurrent.ExecutionContext
+  ): Fu[Paginator[B]] =
+    f(currentPageResults) dmap withCurrentPageResults
 }
 
 object Paginator {
@@ -91,11 +96,14 @@ object Paginator {
       currentPage: Int = 1,
       maxPerPage: MaxPerPage = MaxPerPage(10)
   )(implicit ec: scala.concurrent.ExecutionContext): Validated[String, Fu[Paginator[A]]] =
-    if (currentPage < 1) Validated.invalid("Max per page must be greater than zero")
-    else if (maxPerPage.value <= 0) Validated.invalid("Current page must be greater than zero")
+    if (currentPage < 1) Validated.invalid("Current page must be greater than zero")
+    else if (maxPerPage.value <= 0) Validated.invalid("Max per page must be greater than zero")
     else
       Validated.valid(for {
-        results   <- adapter.slice((currentPage - 1) * maxPerPage.value, maxPerPage.value)
         nbResults <- adapter.nbResults
-      } yield new Paginator(currentPage, maxPerPage, results, nbResults))
+        safePage = currentPage atMost Math.ceil(nbResults.toDouble / maxPerPage.value).toInt atLeast 1
+        // would rather let upstream code know the value they passed in was bad.
+        // unfortunately can't do that without completing nbResults, so ig it's on them to check after
+        results <- adapter.slice((safePage - 1) * maxPerPage.value, maxPerPage.value)
+      } yield new Paginator(safePage, maxPerPage, results, nbResults))
 }

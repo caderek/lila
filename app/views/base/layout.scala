@@ -14,7 +14,7 @@ object layout {
 
   object bits {
     val doctype                      = raw("<!DOCTYPE html>")
-    def htmlTag(implicit lang: Lang) = html(st.lang := lang.code)
+    def htmlTag(implicit lang: Lang) = html(st.lang := lang.code, dir := isRTL.option("rtl"))
     val topComment = raw("""<!-- Lichess is open source! See https://lichess.org/source -->""")
     val charset    = raw("""<meta charset="utf-8">""")
     val viewport = raw(
@@ -48,9 +48,15 @@ object layout {
       )}${crossorigin ?? "crossorigin"}>""")
 
   private def fontPreload(implicit ctx: Context) = frag(
-    preload(assetUrl(s"font/lichess.woff2"), "font", crossorigin = true, "font/woff2".some),
+    preload(assetUrl("font/lichess.woff2"), "font", crossorigin = true, "font/woff2".some),
+    preload(
+      assetUrl("font/noto-sans-v14-latin-regular.woff2"),
+      "font",
+      crossorigin = true,
+      "font/woff2".some
+    ),
     !ctx.pref.pieceNotationIsLetter option
-      preload(assetUrl(s"font/lichess.chess.woff2"), "font", crossorigin = true, "font/woff2".some)
+      preload(assetUrl("font/lichess.chess.woff2"), "font", crossorigin = true, "font/woff2".some)
   )
   private def boardPreload(implicit ctx: Context) = frag(
     preload(assetUrl(s"images/board/${ctx.currentTheme.file}"), "image", crossorigin = false),
@@ -127,12 +133,12 @@ object layout {
   <div id="notify-app" class="dropdown"></div>
 </div>""")
 
-  private def anonDasher(playing: Boolean)(implicit ctx: Context) =
+  private def anonDasher(implicit ctx: Context) =
     spaceless(s"""<div class="dasher">
   <a class="toggle link anon">
     <span title="${trans.preferences.preferences.txt()}" data-icon=""></span>
   </a>
-  <div id="dasher_app" class="dropdown" data-playing="$playing"></div>
+  <div id="dasher_app" class="dropdown"></div>
 </div>
 <a href="${routes.Auth.login}?referrer=${ctx.req.path}" class="signin button button-empty">${trans.signIn
         .txt()}</a>""")
@@ -162,18 +168,11 @@ object layout {
         "display:inline;width:34px;height:34px;vertical-align:top;margin-right:5px;vertical-align:text-top"
     )
 
-  def lichessJsObject(nonce: Nonce)(implicit lang: Lang) =
-    embedJsUnsafe(
-      s"""lichess={load:new Promise(r=>{document.addEventListener("DOMContentLoaded",r)}),quantity:${lila.i18n
-          .JsQuantity(lang)}};$timeagoLocaleScript""",
-      nonce
-    )
-
   private def loadScripts(moreJs: Frag, chessground: Boolean)(implicit ctx: Context) =
     frag(
       chessground option chessgroundTag,
       ctx.requiresFingerprint option fingerprintTag,
-      ctx.nonce map lichessJsObject,
+      ctx.nonce map inlineJs.apply,
       if (netConfig.minifiedAssets)
         jsModule("lichess")
       else
@@ -205,11 +204,11 @@ object layout {
   private val dataVapid         = attr("data-vapid")
   private val dataUser          = attr("data-user")
   private val dataSocketDomains = attr("data-socket-domains") := netConfig.socketDomains.mkString(",")
-  private val dataI18n          = attr("data-i18n")
   private val dataNonce         = attr("data-nonce")
   private val dataAnnounce      = attr("data-announce")
   val dataSoundSet              = attr("data-sound-set")
   val dataTheme                 = attr("data-theme")
+  val dataDirection             = attr("data-direction")
   val dataPieceSet              = attr("data-piece-set")
   val dataAssetUrl              = attr("data-asset-url")      := netConfig.assetBaseUrl.value
   val dataAssetVersion          = attr("data-asset-version")
@@ -225,6 +224,7 @@ object layout {
       openGraph: Option[lila.app.ui.OpenGraph] = None,
       chessground: Boolean = true,
       zoomable: Boolean = false,
+      zenable: Boolean = false,
       csp: Option[ContentSecurityPolicy] = None,
       wrapClass: String = "",
       atomLinkTag: Option[Tag] = None,
@@ -293,6 +293,7 @@ object layout {
               "kid"                  -> ctx.kid,
               "mobile"               -> ctx.isMobileBrowser,
               "playing fixed-scroll" -> playing,
+              "zenable"              -> zenable,
               "no-rating"            -> !ctx.pref.showRatings
             )
           },
@@ -317,8 +318,8 @@ object layout {
             .get(ctx.req)
             .ifTrue(ctx.isAnon)
             .map(views.html.auth.bits.checkYourEmailBanner(_)),
-          playing option zenToggle,
-          siteHeader(playing),
+          zenable option zenToggle,
+          siteHeader.apply,
           div(
             id := "main-wrap",
             cls := List(
@@ -327,16 +328,17 @@ object layout {
               "is3d"    -> ctx.pref.is3d
             )
           )(body),
-          ctx.me.exists(_.enabled) option div(
-            id       := "friend_box",
-            dataI18n := safeJsonValue(i18nJsObject(i18nKeys))
-          )(
+          ctx.me.exists(_.enabled) option div(id := "friend_box")(
             div(cls := "friend_box_title")(trans.nbFriendsOnline.plural(0, iconTag(""))),
             div(cls   := "content_wrap none")(
               div(cls := "content list")
             )
           ),
-          a(id := "reconnecting", cls := "link text", dataIcon := "")(trans.reconnecting()),
+          netConfig.socketDomains.nonEmpty option a(
+            id       := "reconnecting",
+            cls      := "link text",
+            dataIcon := ""
+          )(trans.reconnecting()),
           ctx.pref.agreementNeededSince map { date =>
             div(id := "agreement")(
               div(
@@ -402,7 +404,7 @@ object layout {
           title     := trans.team.teams.txt()
         )
 
-    def apply(playing: Boolean)(implicit ctx: Context) =
+    def apply(implicit ctx: Context) =
       header(id := "top")(
         div(cls := "site-title-nav")(
           !ctx.isAppealUser option topnavToggle,
@@ -428,10 +430,45 @@ object layout {
           else
             ctx.me map { me =>
               frag(allNotifications, dasher(me))
-            } getOrElse { !ctx.pageData.error option anonDasher(playing) }
+            } getOrElse { !ctx.pageData.error option anonDasher }
         )
       )
   }
 
-  private val i18nKeys = List(trans.nbFriendsOnline.key)
+  object inlineJs {
+
+    private val i18nKeys = List(
+      trans.pause.key,
+      trans.resume.key,
+      trans.nbFriendsOnline.key,
+      trans.timeago.justNow.key,
+      trans.timeago.inNbSeconds.key,
+      trans.timeago.inNbMinutes.key,
+      trans.timeago.inNbHours.key,
+      trans.timeago.inNbDays.key,
+      trans.timeago.inNbWeeks.key,
+      trans.timeago.inNbMonths.key,
+      trans.timeago.inNbYears.key,
+      trans.timeago.rightNow.key,
+      trans.timeago.nbSecondsAgo.key,
+      trans.timeago.nbMinutesAgo.key,
+      trans.timeago.nbHoursAgo.key,
+      trans.timeago.nbDaysAgo.key,
+      trans.timeago.nbWeeksAgo.key,
+      trans.timeago.nbMonthsAgo.key,
+      trans.timeago.nbYearsAgo.key
+    )
+
+    private val cache = scala.collection.mutable.AnyRefMap.empty[Lang, String]
+
+    private def jsCode(implicit lang: Lang) =
+      cache.getOrElseUpdate(
+        lang,
+        s"""lichess={load:new Promise(r=>document.addEventListener("DOMContentLoaded",r)),quantity:${lila.i18n
+            .JsQuantity(lang)},siteI18n:${safeJsonValue(i18nJsObject(i18nKeys))}}"""
+      )
+
+    def apply(nonce: Nonce)(implicit lang: Lang) =
+      embedJsUnsafe(jsCode, nonce)
+  }
 }

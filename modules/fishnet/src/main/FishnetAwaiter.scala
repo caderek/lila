@@ -1,6 +1,5 @@
 package lila.fishnet
 
-import akka.actor.ActorSystem
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Promise
@@ -9,7 +8,7 @@ import lila.game.Game
 import lila.common.Bus
 
 /* async wait for analysis to complete */
-final class FishnetAwaiter(implicit ec: ExecutionContext, system: ActorSystem) {
+final class FishnetAwaiter(implicit ec: ExecutionContext, scheduler: akka.actor.Scheduler) {
 
   private val busChannel = "analysisReady"
 
@@ -26,4 +25,6 @@ final class FishnetAwaiter(implicit ec: ExecutionContext, system: ActorSystem) {
         Bus.unsubscribe(listener, busChannel)
       }
     }
+
+  def apply(gameId: Game.ID, atMost: FiniteDuration): Funit = apply(List(gameId), atMost)
 }

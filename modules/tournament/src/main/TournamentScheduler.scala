@@ -1,6 +1,5 @@
 package lila.tournament
 
-import akka.actor._
 import chess.StartingPosition
 import org.joda.time.DateTime
 import org.joda.time.DateTimeConstants._
@@ -8,19 +7,19 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 import scala.util.chaining._
 
-import lila.common.{ AtMost, Every, LilaStream, ResilientScheduler }
+import lila.common.{ LilaScheduler, LilaStream }
 
 final private class TournamentScheduler(
     api: TournamentApi,
     tournamentRepo: TournamentRepo
-)(implicit ec: ExecutionContext, system: ActorSystem, mat: akka.stream.Materializer) {
+)(implicit ec: ExecutionContext, scheduler: akka.actor.Scheduler, mat: akka.stream.Materializer) {
 
   import Schedule.Freq._
   import Schedule.Speed._
   import Schedule.Plan
   import chess.variant._
 
-  ResilientScheduler(every = Every(5 minutes), timeout = AtMost(1 minute), initialDelay = 1 minute) {
+  LilaScheduler(_.Every(5 minutes), _.AtMost(1 minute), _.Delay(1 minute)) {
     tournamentRepo.scheduledUnfinished flatMap { dbScheds =>
       try {
         val newTourns = allWithConflicts(DateTime.now).map(_.build)
@@ -107,7 +106,8 @@ final private class TournamentScheduler(
                 description = s"""
 We've had $yo great chess years together!
 
-Thank you all, you rock!"""
+Thank you all, you rock!""",
+                homepageHours = 24.some
               ).some
             )
           }
@@ -167,7 +167,8 @@ Thank you all, you rock!"""
             month.lastWeek.withDayOfWeek(THURSDAY)  -> RacingKings,
             month.lastWeek.withDayOfWeek(FRIDAY)    -> Antichess,
             month.lastWeek.withDayOfWeek(SATURDAY)  -> Atomic,
-            month.lastWeek.withDayOfWeek(SUNDAY)    -> Horde
+            month.lastWeek.withDayOfWeek(SUNDAY)    -> Horde,
+            month.lastWeek.withDayOfWeek(SUNDAY)    -> ThreeCheck
           ).flatMap { case (day, variant) =>
             at(day, 19) map { date =>
               Schedule(

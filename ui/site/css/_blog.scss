@@ -15,7 +15,7 @@
   .meta {
     span {
       display: inline-block;
-      margin-right: 2em;
+      margin-#{$end-direction}: 2em;
     }
 
     margin-bottom: 1.4rem;

@@ -50,14 +50,14 @@ final private[puzzle] class DailyPuzzle(
     }
 
   private def findNewBiased(tries: Int = 0): Fu[Option[Puzzle]] = {
-    def tryAgainMaybe = (tries < 5) ?? findNewBiased(tries + 1)
+    def tryAgainMaybe = (tries < 7) ?? findNewBiased(tries + 1)
     import lila.common.ThreadLocalRandom.odds
     import PuzzleTheme._
     findNew flatMap {
-      case None                                             => tryAgainMaybe
-      case Some(p) if p.hasTheme(anastasiaMate) && !odds(3) => tryAgainMaybe dmap (_ orElse p.some)
-      case Some(p) if p.hasTheme(arabianMate) && odds(2)    => tryAgainMaybe dmap (_ orElse p.some)
-      case p                                                => fuccess(p)
+      case None => tryAgainMaybe
+      case Some(p) if p.hasTheme(anastasiaMate, arabianMate) && !odds(3) =>
+        tryAgainMaybe dmap (_ orElse p.some)
+      case p => fuccess(p)
     }
   }
 
@@ -66,7 +66,7 @@ final private[puzzle] class DailyPuzzle(
       .path {
         _.aggregateOne() { framework =>
           import framework._
-          Match(pathApi.select(PuzzleTheme.mix.key, PuzzleTier.Top, 2150 to 2300)) -> List(
+          Match(pathApi.select(PuzzleAngle.mix, PuzzleTier.Top, 2150 to 2300)) -> List(
             Sample(3),
             Project($doc("ids" -> true, "_id" -> false)),
             UnwindField("ids"),
@@ -79,7 +79,7 @@ final private[puzzle] class DailyPuzzle(
                 pipe = List(
                   $doc(
                     "$match" -> $doc(
-                      Puzzle.BSONFields.plays $gt 5000,
+                      Puzzle.BSONFields.plays $gt 9000,
                       Puzzle.BSONFields.day $exists false,
                       Puzzle.BSONFields.issue $exists false,
                       Puzzle.BSONFields.themes $ne PuzzleTheme.oneMove.key.value

@@ -4,7 +4,6 @@ import * as cg from 'chessground/types';
 import { ForecastData } from './forecast/interfaces';
 import { StudyPracticeData, Goal as PracticeGoal } from './study/practice/interfaces';
 import { RelayData } from './study/relay/interfaces';
-import AnalyseController from './ctrl';
 import { ChatCtrl } from 'chat';
 import { ExplorerOpts } from './explorer/interfaces';
 import { StudyData } from './study/interfaces';
@@ -15,13 +14,19 @@ export type Seconds = number;
 export { Key, Piece } from 'chessground/types';
 
 export interface NvuiPlugin {
-  render(ctrl: AnalyseController): VNode;
+  render(): VNode;
 }
 
 export interface AnalyseApi {
   socketReceive(type: string, data: any): boolean;
   path(): Tree.Path;
   setChapter(id: string): void;
+}
+
+export interface OpeningPuzzle {
+  key: string;
+  name: string;
+  count: number;
 }
 
 // similar, but not identical, to game/GameData
@@ -47,6 +52,7 @@ export interface AnalyseData {
   userTv?: {
     id: string;
   };
+  puzzle?: OpeningPuzzle;
 }
 
 export interface AnalysePref {
@@ -83,7 +89,7 @@ export interface Game {
   player: Color;
   turns: number;
   fen: Fen;
-  startedAtTurn: number;
+  startedAtTurn?: number;
   source: Source;
   speed: Speed;
   variant: Variant;
@@ -143,6 +149,7 @@ export interface AnalyseOpts {
     instance?: Promise<ChatCtrl>;
   };
   wiki?: boolean;
+  inlinePgn?: string;
 }
 
 export interface JustCaptured extends cg.Piece {
@@ -163,5 +170,11 @@ export interface EvalPutData extends Tree.ServerEval {
 
 export type Conceal = false | 'conceal' | 'hide' | null;
 export type ConcealOf = (isMainline: boolean) => (path: Tree.Path, node: Tree.Node) => Conceal;
+
+export interface AnalyseState {
+  root: Tree.Node;
+  path: Tree.Path;
+  flipped: boolean;
+}
 
 export type Redraw = () => void;

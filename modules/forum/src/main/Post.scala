@@ -111,6 +111,8 @@ object Post {
       }.toSet
   }
 
+  case class WithFrag(post: Post, body: scalatags.Text.all.Frag)
+
   def make(
       topicId: String,
       categId: String,
@@ -121,7 +123,7 @@ object Post {
       lang: Option[String],
       troll: Boolean,
       hidden: Boolean,
-      modIcon: Option[Boolean]
+      modIcon: Option[Boolean] = None
   ): Post = {
 
     Post(

@@ -7,6 +7,7 @@ import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.String.html.safeJsonValue
+import lila.common.Json.colorWrites
 
 object show {
 
@@ -14,7 +15,7 @@ object show {
       puzzle: lila.puzzle.Puzzle,
       data: JsObject,
       pref: JsObject,
-      difficulty: Option[lila.puzzle.PuzzleDifficulty] = None
+      settings: lila.puzzle.PuzzleSettings
   )(implicit ctx: Context) = {
     val isStreak = data.value.contains("streak")
     views.html.base.layout(
@@ -33,13 +34,13 @@ object show {
                 "data"        -> data,
                 "pref"        -> pref,
                 "i18n"        -> bits.jsI18n(streak = isStreak),
-                "showRatings" -> ctx.pref.showRatings
+                "showRatings" -> ctx.pref.showRatings,
+                "settings" -> Json.obj("difficulty" -> settings.difficulty.key).add("color" -> settings.color)
               )
               .add("themes" -> ctx.isAuth.option(bits.jsonThemes))
-              .add("difficulty" -> difficulty.map(_.key))
           )})""")
       ),
-      csp = defaultCsp.withWebAssembly.some,
+      csp = defaultCsp.withWebAssembly.withAnyWs.some,
       chessground = false,
       openGraph = lila.app.ui
         .OpenGraph(
@@ -60,7 +61,7 @@ object show {
         )
         .some,
       zoomable = true,
-      playing = true
+      zenable = true
     ) {
       main(cls := "puzzle")(
         st.aside(cls := "puzzle__side")(

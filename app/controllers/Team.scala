@@ -14,6 +14,7 @@ import lila.common.HTTPRequest
 import lila.memo.RateLimit
 import lila.team.{ Requesting, Team => TeamModel }
 import lila.user.{ Holder, User => UserModel }
+import lila.common.config
 
 final class Team(
     env: Env,
@@ -44,7 +45,26 @@ final class Team(
   def show(id: String, page: Int, mod: Boolean) =
     Open { implicit ctx =>
       Reasonable(page) {
-        OptionFuOk(api team id) { renderTeam(_, page, mod && isGranted(_.ManageTeam)) }
+        OptionFuOk(api team id) { renderTeam(_, page, mod) }
+      }
+    }
+
+  def members(id: String, page: Int) =
+    Open { implicit ctx =>
+      Reasonable(page, config.Max(50)) {
+        OptionFuResult(api teamEnabled id) { team =>
+          val canSee =
+            fuccess(team.publicMembers || isGranted(_.ManageTeam)) >>| ctx.userId.?? {
+              api.belongsTo(team.id, _)
+            }
+          canSee flatMap {
+            case true =>
+              paginator.teamMembersWithDate(team, page) map {
+                html.team.members(team, _)
+              }
+            case false => authorizationFailed
+          }
+        }
       }
     }
 
@@ -63,7 +83,7 @@ final class Team(
     for {
       info    <- env.teamInfo(team, ctx.me, withForum = canHaveForum(team, requestModView))
       members <- paginator.teamMembers(team, page)
-      log     <- requestModView.??(env.mod.logApi.teamLog(team.id))
+      log     <- (requestModView && isGranted(_.ManageTeam)).??(env.mod.logApi.teamLog(team.id))
       hasChat = canHaveChat(team, info, requestModView)
       chat <-
         hasChat ?? env.chat.api.userChat.cached
@@ -213,7 +233,7 @@ final class Team(
             _ => funit,
             explain =>
               api.toggleEnabled(team, me, explain) >> {
-                team.enabled ?? env.mod.logApi.disableTeam(me.id, team.id, explain)
+                env.mod.logApi.toggleTeam(me.id, team.id, team.enabled, explain)
               }
           )
       } inject Redirect(routes.Team show id).flashSuccess
@@ -423,16 +443,27 @@ final class Team(
     AuthOrScoped(_.Team.Write)(
       auth = implicit ctx =>
         me =>
-          OptionFuResult(api.cancelRequest(id, me) orElse api.quit(id, me)) { team =>
-            negotiate(
-              html = Redirect(routes.Team.mine).flashSuccess.fuccess,
-              api = _ => jsonOkResult.fuccess
-            )
+          OptionFuResult(api team id) { team =>
+            if (team isOnlyLeader me.id)
+              negotiate(
+                html = Redirect(routes.Team.edit(team.id))
+                  .flashFailure(lila.i18n.I18nKeys.team.onlyLeaderLeavesTeam.txt())
+                  .fuccess,
+                api = _ => jsonOkResult.fuccess
+              )
+            else
+              api.cancelRequestOrQuit(team, me) >>
+                negotiate(
+                  html = Redirect(routes.Team.mine).flashSuccess.fuccess,
+                  api = _ => jsonOkResult.fuccess
+                )
           }(ctx),
       scoped = _ =>
         me =>
-          api.quit(id, me) flatMap {
-            _.fold(notFoundJson())(_ => jsonOkResult.fuccess)
+          api team id flatMap {
+            _.fold(notFoundJson()) { team =>
+              api.cancelRequestOrQuit(team, me) inject jsonOkResult
+            }
           }
     )
 
@@ -460,14 +491,15 @@ final class Team(
   def pmAll(id: String) =
     Auth { implicit ctx => _ =>
       WithOwnedTeamEnabled(id) { team =>
-        env.tournament.api
-          .visibleByTeam(team.id, 0, 20)
-          .dmap(_.next)
-          .map { tours =>
-            Ok(html.team.admin.pmAll(team, forms.pmAll, tours))
-          }
+        renderPmAll(team, forms.pmAll)
       }
     }
+
+  private def renderPmAll(team: TeamModel, form: Form[_])(implicit ctx: Context) =
+    for {
+      tours  <- env.tournament.api.visibleByTeam(team.id, 0, 20).dmap(_.next)
+      unsubs <- env.team.cached.unsubs.get(team.id)
+    } yield Ok(html.team.admin.pmAll(team, form, tours, unsubs))
 
   def pmAllSubmit(id: String) =
     AuthOrScopedBody(_.Team.Write)(
@@ -475,13 +507,7 @@ final class Team(
         me =>
           WithOwnedTeamEnabled(id) { team =>
             doPmAll(team, me)(ctx.body).fold(
-              err =>
-                env.tournament.api
-                  .visibleByTeam(team.id, 0, 20)
-                  .dmap(_.next)
-                  .map { tours =>
-                    BadRequest(html.team.admin.pmAll(team, err, tours))
-                  },
+              err => renderPmAll(team, err),
               _ map { res =>
                 Redirect(routes.Team.show(team.id))
                   .flashing(res match {

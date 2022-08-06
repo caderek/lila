@@ -1,9 +1,9 @@
 import AnalyseCtrl from '../../ctrl';
 import RelayCtrl from './relayCtrl';
 import { dataIcon } from 'common/snabbdom';
-import { innerHTML } from '../../util';
 import { h, VNode } from 'snabbdom';
-import { RelayRound } from './interfaces';
+import { innerHTML } from '../../util';
+import { LeadPlayer, RelayRound } from './interfaces';
 import { StudyCtrl } from '../interfaces';
 import { view as multiBoardView } from '../multiBoard';
 
@@ -40,6 +40,7 @@ export default function (ctrl: AnalyseCtrl): VNode | undefined {
             })
           : h('div', relay.data.tour.description),
         roundsTable(relay),
+        relay.data.leaderboard?.length ? leaderboard(relay.data.leaderboard) : undefined,
       ]),
       study.looksNew() ? null : multiBoardView(study.multiBoard, study),
     ]);
@@ -47,8 +48,36 @@ export default function (ctrl: AnalyseCtrl): VNode | undefined {
   return undefined;
 }
 
-function roundsTable(relay: RelayCtrl): VNode {
-  return h('div.relay-tour__text__schedule', [
+const leaderboard = (players: LeadPlayer[]): VNode => {
+  const withRating = players.find(p => p.rating);
+  return h('div.relay-tour__text__leaderboard', [
+    h('table.slist.slist-invert', [
+      h(
+        'thead',
+        h('tr', [
+          h('th', h('h2', 'Leaderboard')),
+          withRating ? h('th', 'Elo') : undefined,
+          h('th', 'Score'),
+          h('th', 'Games'),
+        ])
+      ),
+      h(
+        'tbody',
+        players.map(player =>
+          h('tr', [
+            h('th', player.name),
+            withRating ? h('td', player.rating) : undefined,
+            h('td', player.score),
+            h('td', player.played),
+          ])
+        )
+      ),
+    ]),
+  ]);
+};
+
+const roundsTable = (relay: RelayCtrl): VNode =>
+  h('div.relay-tour__text__schedule', [
     h('h2', 'Schedule'),
     h(
       'table.slist.slist-invert',
@@ -73,7 +102,6 @@ function roundsTable(relay: RelayCtrl): VNode {
       )
     ),
   ]);
-}
 
 const roundStateIcon = (round: RelayRound) =>
   round.ongoing
@@ -87,7 +115,7 @@ export function rounds(ctrl: StudyCtrl): VNode {
   const relay = ctrl.relay!;
   return h(
     'div.study__relay__rounds',
-    relay!.data.rounds
+    relay.data.rounds
       .map(round =>
         h(
           'div',

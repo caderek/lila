@@ -56,7 +56,8 @@
 }
 
 form.mode,
-form.color {
+form.color,
+form.timeControl {
   margin-top: $block-gap;
 
   i {
@@ -69,8 +70,14 @@ form.color {
   }
 }
 
-form.mode .mode_option {
+.mode_option,
+.timeControl_option {
   width: 50%;
+}
+
+.timeControl_untimed {
+  font-size: 1.5em;
+  line-height: 1em;
 }
 
 form.color {
@@ -91,6 +98,17 @@ form.color {
   display: flex;
   flex-direction: column;
   row-gap: 1em;
+}
+
+.back {
+  @extend %flex-column;
+  align-items: center;
+  margin-top: $block-gap;
+}
+
+.back-button {
+  font-size: 1.5em;
+  text-transform: uppercase;
 }
 
 .progress {
@@ -141,7 +159,7 @@ form.color {
 
   input.keyboard {
     width: 4em;
-    margin-right: 1em;
+    margin-#{$end-direction}: 1em;
   }
   &.hidden {
     display: none;
@@ -156,5 +174,17 @@ form.color {
     height: 3em;
     border-width: 3px;
     font-weight: bold;
+  }
+}
+
+.setting {
+  flex: 0 0 auto;
+  margin: $block-gap $block-gap 0 $block-gap;
+  display: flex;
+
+  label {
+    flex: 4 1 auto;
+    cursor: pointer;
+    white-space: nowrap;
   }
 }

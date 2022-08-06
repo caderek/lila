@@ -56,7 +56,7 @@ object tourForm {
     form3.group(form("name"), tournamentName())(form3.input(_)(autofocus)),
     form3.group(form("description"), tournamentDescription())(form3.textarea(_)(rows := 2)),
     form3.group(
-      form("markup"),
+      form("markdown"),
       fullDescription(),
       help = fullDescriptionHelp(
         a(
@@ -66,12 +66,21 @@ object tourForm {
         20000.localize
       ).some
     )(form3.textarea(_)(rows := 10)),
-    if (isGranted(_.Relay))
-      form3.group(
-        form("tier"),
-        raw("Official Lichess broadcast tier"),
-        help = raw("Feature on /broadcast - for admins only").some
-      )(form3.select(_, RelayTour.Tier.options))
-    else form3.hidden(form("tier"))
+    form3.split(
+      form3.checkbox(
+        form("autoLeaderboard"),
+        raw("Automatic leaderboard"),
+        help = raw("Compute and display a simple leaderboard based on game results").some,
+        half = true
+      ),
+      if (isGranted(_.Relay))
+        form3.group(
+          form("tier"),
+          raw("Official Lichess broadcast tier"),
+          help = raw("Feature on /broadcast - for admins only").some,
+          half = true
+        )(form3.select(_, RelayTour.Tier.options))
+      else form3.hidden(form("tier"))
+    )
   )
 }

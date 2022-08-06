@@ -13,18 +13,15 @@ final class OnlineApiUsers(
 )(implicit ec: scala.concurrent.ExecutionContext, mode: play.api.Mode) {
 
   private val cache = new ExpireCallbackMemo(
+    scheduler,
     10.seconds,
     userId => publish(userId, isOnline = false)
   )
 
   def setOnline(userId: lila.user.User.ID): Unit = {
-    // We must delay the event publication, because caffeine
-    // delays the removal listener, therefore when a bot reconnects,
-    // the offline event is sent after the online event.
-    if (!isOnline(userId) || !cache.get(userId)) scheduler.scheduleOnce(1 second) {
-      publish(userId, isOnline = true)
-    }
+    val wasOffline = !isOnline(userId) && !cache.get(userId)
     cache.put(userId)
+    if (wasOffline) publish(userId, isOnline = true)
   }
 
   def get: Set[lila.user.User.ID] = cache.keySet

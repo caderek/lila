@@ -57,6 +57,7 @@
   </plurals>
   <string name="example">Przykład</string>
   <string name="addAnotherTheme">Dodaj inny motyw</string>
+  <string name="nextPuzzle">Następne zadanie</string>
   <string name="jumpToNextPuzzleImmediately">Natychmiast przejdź do następnego zadania</string>
   <string name="puzzleDashboard">Tablica z zadaniami</string>
   <string name="improvementAreas">Obszary rozwoju</string>
@@ -75,7 +76,7 @@
   <string name="searchPuzzles">Szukaj zadań</string>
   <string name="fromMyGamesNone">Nie masz zadań w bazie danych, ale Lichess nadal bardzo Cię kocha.
 Graj partie szybkie i klasyczne, aby zwiększyć swoje szanse na dodanie zadania!</string>
-  <string name="fromXGamesFound">%1$s zadań znalezionych w %2$s grach</string>
+  <string name="fromXGamesFound" comment="fromXGamesFound&#10;&#10;The first variable is a number, and the second is a link to a user's profile (e.g. 2 puzzles found in &lt;username&gt; games)&#10;&#10;All games on Lichess are generated from players' games.">%1$s zadań znalezionych w %2$s grach</string>
   <string name="puzzleDashboardDescription">Trenuj, analizuj, doskonal się</string>
   <plurals name="nbPlayed">
     <item quantity="one">%s rozwiązywanych</item>

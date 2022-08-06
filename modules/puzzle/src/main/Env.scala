@@ -23,12 +23,14 @@ final class Env(
     historyApi: lila.history.HistoryApi,
     lightUserApi: lila.user.LightUserApi,
     cacheApi: lila.memo.CacheApi,
+    mongoCacheApi: lila.memo.MongoCache.Api,
     gameRepo: lila.game.GameRepo,
     userRepo: lila.user.UserRepo,
     mongo: lila.db.Env
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     system: akka.actor.ActorSystem,
+    scheduler: akka.actor.Scheduler,
     mode: play.api.Mode
 ) {
 
@@ -56,6 +58,8 @@ final class Env(
 
   lazy val session: PuzzleSessionApi = wire[PuzzleSessionApi]
 
+  lazy val selector: PuzzleSelector = wire[PuzzleSelector]
+
   lazy val anon: PuzzleAnon = wire[PuzzleAnon]
 
   lazy val batch: PuzzleBatch = wire[PuzzleBatch]
@@ -76,8 +80,16 @@ final class Env(
 
   lazy val streak = wire[PuzzleStreakApi]
 
+  lazy val opening = wire[PuzzleOpeningApi]
+
+  private lazy val phaser = wire[PuzzlePhaser]
+
+  scheduler.scheduleAtFixedRate(10 minutes, 1 day) { () =>
+    opening.addAllMissing >> phaser.addAllMissing unit
+  }
+
   if (mode == play.api.Mode.Prod)
-    system.scheduler.scheduleAtFixedRate(1 hour, 1 hour) { () =>
+    scheduler.scheduleAtFixedRate(1 hour, 1 hour) { () =>
       pathApi.isStale foreach { stale =>
         if (stale) logger.error("Puzzle paths appear to be stale! check that the regen cron is up")
       }

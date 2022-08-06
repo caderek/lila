@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="preferences">偏好設置</string>
-  <string name="gameDisplay">棋局顯示</string>
   <string name="pieceAnimation">棋子動畫</string>
   <string name="materialDifference">子力差距</string>
   <string name="boardHighlights">棋盘高亮（最后一步与将军）</string>
@@ -26,7 +25,7 @@
   <string name="inCasualGamesOnly">僅限非正式遊戲</string>
   <string name="promoteToQueenAutomatically">兵自動升為后</string>
   <string name="whenPremoving">預先走棋時</string>
-  <string name="whenTimeRemainingLessThanThirtySeconds">当剩余时间小于30秒</string>
+  <string name="whenTimeRemainingLessThanThirtySeconds" comment="whenTimeRemainingLessThanThirtySeconds&#10;&amp;lt; becomes &lt;.&#10;The &amp;lt; symbol is not required (you can write it as 'less than' in words), just do NOT use &lt; in its place.">当剩余时间小于30秒</string>
   <string name="moveConfirmation">走棋确认</string>
   <string name="inCorrespondenceGames">在长期对局中</string>
   <string name="correspondenceAndUnlimited">通信和無限</string>

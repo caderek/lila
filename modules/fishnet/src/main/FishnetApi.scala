@@ -20,7 +20,7 @@ final class FishnetApi(
     config: FishnetApi.Config
 )(implicit
     ec: scala.concurrent.ExecutionContext,
-    system: akka.actor.ActorSystem
+    scheduler: akka.actor.Scheduler
 ) {
 
   import FishnetApi._
@@ -98,7 +98,7 @@ final class FishnetApi(
                 }
               } recoverWith { case e: Exception =>
                 Monitor.failure(work, client, e)
-                repo.updateOrGiveUpAnalysis(work.invalid) >> fufail(e)
+                repo.updateOrGiveUpAnalysis(work, _.invalid) >> fufail(e)
               }
             case partial: PartialAnalysis =>
               {

@@ -23,7 +23,7 @@ object show {
       title = rt.fullName,
       moreCss = cssTag("analyse.relay"),
       moreJs = frag(
-        analyseTag,
+        analyseStudyTag,
         analyseNvuiTag,
         embedJsUnsafe(s"""lichess.relay=${safeJsonValue(
             Json.obj(
@@ -52,7 +52,7 @@ object show {
       ),
       chessground = false,
       zoomable = true,
-      csp = defaultCsp.withWebAssembly.withWikiBooks.some,
+      csp = defaultCsp.withWebAssembly.withAnyWs.withWikiBooks.some,
       openGraph = lila.app.ui
         .OpenGraph(
           title = rt.fullName,

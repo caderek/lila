@@ -9,7 +9,7 @@ import play.api.mvc._
 import scala.concurrent.duration._
 import views._
 
-import lila.api.Context
+import lila.api.{ Context, ExternalEngine }
 import lila.app._
 import lila.game.Pov
 import lila.round.Forecast.{ forecastJsonWriter, forecastStepJsonFormat }
@@ -50,6 +50,18 @@ final class UserAnalysis(
       }
     }
 
+  def pgn(pgn: String) =
+    Open { implicit ctx =>
+      val pov         = makePov(none, Standard)
+      val orientation = get("color").flatMap(chess.Color.fromName) | pov.color
+      env.api.roundApi
+        .userAnalysisJson(pov, ctx.pref, none, orientation, owner = false, me = ctx.me) map { data =>
+        EnableSharedArrayBuffer(
+          Ok(html.board.userAnalysis(data, pov, inlinePgn = pgn.replace("_", " ").some))
+        )
+      }
+    }
+
   private[controllers] def makePov(fen: Option[FEN], variant: Variant): Pov =
     makePov {
       fen.filter(_.value.nonEmpty).flatMap {
@@ -75,6 +87,7 @@ final class UserAnalysis(
       from.situation.color
     )
 
+  // correspondence premove aka forecast
   def game(id: String, color: String) =
     Open { implicit ctx =>
       OptionFuResult(env.game.gameRepo game id) { g =>
@@ -136,34 +149,6 @@ final class UserAnalysis(
         }
     }
 
-  // XHR only
-  def pgn =
-    OpenBody { implicit ctx =>
-      implicit val req = ctx.body
-      env.importer.forms.importForm
-        .bindFromRequest()
-        .fold(
-          jsonFormError,
-          data =>
-            env.importer.importer
-              .inMemory(data)
-              .fold(
-                err => BadRequest(jsonError(err)).as(JSON).fuccess,
-                { case (game, fen) =>
-                  val pov = Pov(game, chess.White)
-                  env.api.roundApi.userAnalysisJson(
-                    pov,
-                    ctx.pref,
-                    initialFen = fen,
-                    pov.color,
-                    owner = false,
-                    me = ctx.me
-                  ) map JsonOk
-                }
-              )
-        )
-    }
-
   private def forecastReload = JsonOk(Json.obj("reload" -> true))
 
   def forecasts(fullId: String) =
@@ -207,6 +192,13 @@ final class UserAnalysis(
             )
       }
     }
+
+  def external = Open { implicit ctx =>
+    ExternalEngine.form
+      .bindFromRequest(ctx.req.queryString)
+      .fold(err => BadRequest(errorsAsJson(err)), prompt => Ok(html.analyse.external(prompt)))
+      .fuccess
+  }
 
   def help =
     Open { implicit ctx =>

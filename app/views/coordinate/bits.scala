@@ -26,8 +26,10 @@ object bits {
   )
 
   private val i18nKeys = List(
-    trans.coordinates.aSquareIsHighlighted,
-    trans.coordinates.aSquareNameAppears,
+    trans.coordinates.aSquareIsHighlightedExplanation,
+    trans.coordinates.aCoordinateAppears,
+    trans.coordinates.youHaveThirtySeconds,
+    trans.coordinates.goAsLongAsYouWant,
     trans.coordinates.averageScoreAsBlackX,
     trans.coordinates.averageScoreAsWhiteX,
     trans.coordinates.coordinates,
@@ -38,7 +40,13 @@ object bits {
     trans.coordinates.youCanAnalyseAGameMoreEffectively,
     trans.coordinates.findSquare,
     trans.coordinates.nameSquare,
+    trans.coordinates.showCoordinates,
+    trans.coordinates.showPieces,
     trans.storm.score,
-    trans.time
+    trans.study.back,
+    trans.time,
+    trans.asWhite,
+    trans.asBlack,
+    trans.randomColor
   ).map(_.key)
 }

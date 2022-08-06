@@ -49,8 +49,8 @@ const renderDrawOffer = () =>
     '½?'
   );
 
-function renderMove(step: Step, curPly: number, orEmpty: boolean, drawOffers: Set<number>) {
-  return step
+const renderMove = (step: Step, curPly: number, orEmpty: boolean, drawOffers: Set<number>) =>
+  step
     ? h(
         moveTag,
         {
@@ -63,7 +63,6 @@ function renderMove(step: Step, curPly: number, orEmpty: boolean, drawOffers: Se
     : orEmpty
     ? h(moveTag, '…')
     : undefined;
-}
 
 export function renderResult(ctrl: RoundController): VNode | undefined {
   let result: string | undefined;
@@ -101,7 +100,9 @@ function renderMoves(ctrl: RoundController): MaybeVNodes {
   const steps = ctrl.data.steps,
     firstPly = round.firstPly(ctrl.data),
     lastPly = round.lastPly(ctrl.data),
+    indexOffset = Math.trunc(firstPly / 2) + 1,
     drawPlies = new Set(ctrl.data.game.drawOffers || []);
+
   if (typeof lastPly === 'undefined') return [];
 
   const pairs: Array<Array<any>> = [];
@@ -115,7 +116,7 @@ function renderMoves(ctrl: RoundController): MaybeVNodes {
   const els: MaybeVNodes = [],
     curPly = ctrl.ply;
   for (let i = 0; i < pairs.length; i++) {
-    els.push(h(indexTag, i + 1 + ''));
+    els.push(h(indexTag, i + indexOffset + ''));
     els.push(renderMove(pairs[i][0], curPly, true, drawPlies));
     els.push(renderMove(pairs[i][1], curPly, false, drawPlies));
   }
@@ -148,6 +149,17 @@ function renderButtons(ctrl: RoundController) {
   const d = ctrl.data,
     firstPly = round.firstPly(d),
     lastPly = round.lastPly(d);
+  let iconFirst = '';
+  let iconPrev = '';
+  let iconNext = '';
+  let iconLast = '';
+  if (document.dir == 'rtl') {
+    iconLast = '';
+    iconNext = '';
+    iconPrev = '';
+    iconFirst = '';
+  }
+
   return h(
     'div.buttons',
     {
@@ -180,10 +192,10 @@ function renderButtons(ctrl: RoundController) {
         },
       }),
       ...[
-        ['', firstPly],
-        ['', ctrl.ply - 1],
-        ['', ctrl.ply + 1],
-        ['', lastPly],
+        [iconFirst, firstPly],
+        [iconPrev, ctrl.ply - 1],
+        [iconNext, ctrl.ply + 1],
+        [iconLast, lastPly],
       ].map((b, i) => {
         const enabled = ctrl.ply !== b[1] && b[1] >= firstPly && b[1] <= lastPly;
         return h('button.fbt', {
@@ -212,8 +224,8 @@ function initMessage(ctrl: RoundController) {
     : null;
 }
 
-function col1Button(ctrl: RoundController, dir: number, icon: string, disabled: boolean) {
-  return h('button.fbt', {
+const col1Button = (ctrl: RoundController, dir: number, icon: string, disabled: boolean) =>
+  h('button.fbt', {
     attrs: {
       disabled: disabled,
       'data-icon': icon,
@@ -225,7 +237,6 @@ function col1Button(ctrl: RoundController, dir: number, icon: string, disabled: 
       ctrl.redraw();
     }),
   });
-}
 
 export function render(ctrl: RoundController): VNode | undefined {
   const d = ctrl.data,

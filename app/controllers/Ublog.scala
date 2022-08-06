@@ -10,6 +10,7 @@ import lila.user.{ User => UserModel }
 import play.api.i18n.Lang
 import lila.i18n.LangList
 import lila.report.Suspect
+import lila.common.config
 
 final class Ublog(env: Env) extends LilaController(env) {
 
@@ -49,16 +50,38 @@ final class Ublog(env: Env) extends LilaController(env) {
               else {
                 env.ublog.api.otherPosts(UblogBlog.Id.User(user.id), post) zip
                   ctx.me.??(env.ublog.rank.liked(post)) zip
-                  ctx.userId.??(env.relation.api.fetchFollows(_, user.id)) map {
-                    case ((others, liked), followed) =>
-                      val viewedPost = env.ublog.viewCounter(post, ctx.ip)
-                      val markup     = scalatags.Text.all.raw(env.ublog.markup(post))
-                      Ok(html.ublog.post(user, blog, viewedPost, markup, others, liked, followed))
+                  ctx.userId.??(env.relation.api.fetchFollows(_, user.id)) zip
+                  env.ublog.markup(post) map { case (((others, liked), followed), markup) =>
+                    val viewedPost = env.ublog.viewCounter(post, ctx.ip)
+                    Ok(html.ublog.post(user, blog, viewedPost, markup, others, liked, followed))
                   }
               }
             }
           }
         }
+      }
+    }
+  }
+
+  def discuss(id: String) = Open { implicit ctx =>
+    NotForKids {
+      import lila.forum.Categ.ublogSlug
+      val topicSlug = s"ublog-${id}"
+      val redirect  = Redirect(routes.ForumTopic.show(ublogSlug, topicSlug))
+      env.forum.topicRepo.existsByTree(ublogSlug, topicSlug) flatMap {
+        case true => fuccess(redirect)
+        case _ =>
+          env.ublog.api.getPost(UblogPost.Id(id)) flatMap {
+            _ ?? { post =>
+              env.forum.topicApi.makeUblogDiscuss(
+                slug = topicSlug,
+                name = post.title,
+                url = s"${env.net.baseUrl}${routes.Ublog.post(post.created.by, post.slug, id)}",
+                ublogId = id,
+                authorId = post.created.by
+              )
+            } inject redirect
+          }
       }
     }
   }
@@ -226,7 +249,7 @@ final class Ublog(env: Env) extends LilaController(env) {
 
   def friends(page: Int) = Auth { implicit ctx => me =>
     NotForKids {
-      Reasonable(page, 10) {
+      Reasonable(page, config.Max(10)) {
         env.ublog.paginator.liveByFollowed(me, page) map { posts =>
           Ok(html.ublog.index.friends(posts))
         }
@@ -237,7 +260,7 @@ final class Ublog(env: Env) extends LilaController(env) {
   def community(code: String, page: Int) = Open { implicit ctx =>
     NotForKids {
       val l = Lang.get(code).filter(LangList.popularNoRegion.contains)
-      Reasonable(page, 8) {
+      Reasonable(page, config.Max(8)) {
         env.ublog.paginator.liveByCommunity(l, page) map { posts =>
           Ok(html.ublog.index.community(l, posts))
         }
@@ -254,7 +277,7 @@ final class Ublog(env: Env) extends LilaController(env) {
 
   def liked(page: Int) = Auth { implicit ctx => me =>
     NotForKids {
-      Reasonable(page, 15) {
+      Reasonable(page, config.Max(15)) {
         ctx.me ?? { me =>
           env.ublog.paginator.liveByLiked(me, page) map { posts =>
             Ok(html.ublog.index.liked(posts))
@@ -274,7 +297,7 @@ final class Ublog(env: Env) extends LilaController(env) {
 
   def topic(str: String, page: Int) = Open { implicit ctx =>
     NotForKids {
-      Reasonable(page, 5) {
+      Reasonable(page, config.Max(5)) {
         lila.ublog.UblogTopic.fromUrl(str) ?? { top =>
           env.ublog.paginator.liveByTopic(top, page) map { posts =>
             Ok(html.ublog.index.topic(top, posts))

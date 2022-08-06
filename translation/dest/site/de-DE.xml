@@ -338,7 +338,7 @@
   <string name="youAreNotInTeam">Du bist nicht in Team %s</string>
   <string name="backToGame">Zurück zur Partie</string>
   <string name="siteDescription">Kostenloser Online-Schach-Server. Spiele jetzt auf einer übersichtlichen Benutzeroberfläche Schach! Keine Registrierung und keine Plugins erforderlich, komplett ohne Werbung. Spiele gegen den Computer, Freunde oder zufällige Gegner!</string>
-  <string name="xJoinedTeamY">%1$s trat der Gruppe %2$s bei</string>
+  <string name="xJoinedTeamY">%1$s trat dem Team %2$s bei</string>
   <string name="xCreatedTeamY">%1$s hat das Team %2$s gegründet</string>
   <string name="xStartedStreaming">%s hat einen Stream gestartet</string>
   <string name="averageElo">Durchschnittswertung</string>
@@ -348,6 +348,8 @@
   <string name="apply">Anwenden</string>
   <string name="save">Speichern</string>
   <string name="leaderboard">Rangliste</string>
+  <string name="screenshotCurrentPosition">Eine Bildschirmaufnahme der aktuellen Stellung anfertigen</string>
+  <string name="gameAsGIF">Partie als GIF</string>
   <string name="pasteTheFenStringHere">Füge den FEN-Text hier ein</string>
   <string name="pasteThePgnStringHere">Füge den PGN-Text hier ein</string>
   <string name="orUploadPgnFile">Oder lade eine PGN-Datei hoch</string>
@@ -426,6 +428,8 @@
   <string name="tournamentIsStarting">Das Turnier beginnt</string>
   <string name="tournamentPairingsAreNowClosed">Es werden keine neuen Turnierspiele mehr gestartet.</string>
   <string name="standByX">Die Turnier-Paarungen werden zugeteilt. Fertig machen zum Start, %s!</string>
+  <string name="pause">Pausieren</string>
+  <string name="resume">Fortsetzen</string>
   <string name="youArePlaying">Dein Spiel beginnt!</string>
   <string name="winRate">Gewinnrate</string>
   <string name="berserkRate">Berserkrate</string>
@@ -460,11 +464,15 @@
   <string name="socialMediaLinks">Social-Media-Links</string>
   <string name="oneUrlPerLine">Eine URL pro Zeile.</string>
   <string name="inlineNotation">Inline-Notation</string>
+  <string name="savingMoves">Zwischenzeitlicher Zug-Speicher</string>
+  <string name="savingMovesHelp">Wir speichern deine Varianten in deinem Browser-Cache.</string>
+  <string name="makeAStudy">Um sicher zu gehen und zum Teilen, überlege, ob du eine Studie anlegen möchtest.</string>
+  <string name="clearSavedMoves">Züge löschen</string>
   <string name="previouslyOnLichessTV">Zuletzt auf Lichess TV</string>
   <string name="onlinePlayers">Spieler online</string>
   <string name="activePlayers">Aktive Spieler</string>
   <string name="bewareTheGameIsRatedButHasNoClock">Achtung! Das Spiel wird gewertet, aber ohne Uhr gespielt!</string>
-  <string name="success">Korrekt</string>
+  <string name="success">Gespeichert</string>
   <plurals name="nbGamesInPlay">
     <item quantity="one">%s laufende Partie</item>
     <item quantity="other">%s laufende Partien</item>
@@ -563,6 +571,7 @@
   <string name="community">Gemeinschaft</string>
   <string name="tools">Werkzeuge</string>
   <string name="increment">Inkrement</string>
+  <string name="error.unknown">Ungültiger Wert</string>
   <string name="error.required">Dieses Feld muss ausgefüllt werden</string>
   <string name="error.email">Diese E-Mail-Adresse ist ungültig</string>
   <string name="error.email_acceptable">Diese E-Mail-Adresse wird nicht akzeptiert. Bitte überprüfe sie und versuche es erneut.</string>
@@ -713,7 +722,7 @@
   <string name="usernameAlreadyUsed">Dieser Benutzername ist bereits vergeben. Bitte versuche es mit einem anderen.</string>
   <string name="usernamePrefixInvalid">Der Benutzername muss mit einem Buchstaben beginnen.</string>
   <string name="usernameSuffixInvalid">Der Benutzername muss mit einem Buchstaben oder einer Zahl enden.</string>
-  <string name="usernameCharsInvalid">Der Benutzername darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche beinhalten.</string>
+  <string name="usernameCharsInvalid">Der Benutzername darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche beinhalten. Aufeinanderfolgende Unterstriche und Bindestriche sind nicht erlaubt.</string>
   <string name="usernameUnacceptable">Dieser Benutzername ist nicht akzeptabel.</string>
   <string name="playChessInStyle">Schachspielen mit Style</string>
   <string name="chessBasics">Grundlagen</string>
@@ -883,7 +892,7 @@ Leer lassen, um Partien von der normalen Ausgangsstellung aus zu starten.</strin
   <string name="showHelpDialog">Diesen Hilfedialog anzeigen</string>
   <string name="reopenYourAccount">Wiedereröffnung deines Kontos</string>
   <string name="closedAccountChangedMind">Wenn du dein Konto geschlossen, aber danach deine Meinung geändert hast, hast du eine Chance, dein Konto zurückzuerhalten.</string>
-  <string name="onlyWorksOnce">Das funktioniert nur ein einziges mal.</string>
+  <string name="onlyWorksOnce">Das funktioniert nur einmal.</string>
   <string name="cantDoThisTwice">Wenn du dein Konto ein zweites Mal schließt, wird es keine Möglichkeit geben, es wiederherzustellen.</string>
   <string name="emailAssociatedToaccount">E-Mail-Adresse deines Kontos</string>
   <string name="sentEmailWithLink">Wir haben dir eine E-Mail mit einem Link geschickt.</string>
@@ -893,7 +902,7 @@ Leer lassen, um Partien von der normalen Ausgangsstellung aus zu starten.</strin
   <string name="abortTheGame">Partie abbrechen</string>
   <string name="resignTheGame">Partie aufgeben</string>
   <string name="youCantStartNewGame">Du kannst keine neue Partie starten, bevor diese beendet ist.</string>
-  <string name="since">Von</string>
+  <string name="since">Seit</string>
   <string name="until">Bis</string>
   <string name="lichessDbExplanation">Aus gewerteten Partien aller Lichess-Spieler</string>
   <string name="switchSides">andere Farbe</string>

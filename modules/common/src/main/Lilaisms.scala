@@ -21,6 +21,7 @@ trait Lilaisms
 
   type StringValue = lila.base.LilaTypes.StringValue
   type IntValue    = lila.base.LilaTypes.IntValue
+  type Percent     = lila.base.LilaTypes.Percent
 
   @inline implicit def toLilaFuture[A](f: Fu[A])               = new LilaFuture(f)
   @inline implicit def toLilaFutureBoolean(f: Fu[Boolean])     = new LilaFutureBoolean(f)
@@ -31,7 +32,7 @@ trait Lilaisms
   @inline implicit def toLilaJsObject(jo: JsObject) = new LilaJsObject(jo)
   @inline implicit def toLilaJsValue(jv: JsValue)   = new LilaJsValue(jv)
 
-  @inline implicit def toAugmentedAny(b: Any)    = new AugmentedAny(b)
+  @inline implicit def toAugmentedAny[A](b: A)   = new AugmentedAny(b)
   @inline implicit def toLilaBoolean(b: Boolean) = new LilaBoolean(b)
   @inline implicit def toLilaInt(i: Int)         = new LilaInt(i)
   @inline implicit def toLilaLong(l: Long)       = new LilaLong(l)

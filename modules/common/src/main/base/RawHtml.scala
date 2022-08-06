@@ -2,9 +2,12 @@ package lila.base
 
 import java.lang.Character.isLetterOrDigit
 import java.lang.{ Math, StringBuilder => jStringBuilder }
+import java.util.regex.Matcher
 import scala.annotation.{ switch, tailrec }
 
-import lila.common.base.StringUtils.escapeHtmlRaw
+import lila.common.base.StringUtils.{ escapeHtmlRaw, escapeHtmlRawInPlace }
+import scalatags.Text.all._
+import lila.common.config
 
 final object RawHtml {
 
@@ -35,9 +38,6 @@ final object RawHtml {
 
   private[this] val USER_LINK = """/@/([\w-]{2,30}+)?""".r
 
-  final private[this] val DOMAIN      = "lichess.org"
-  final private[this] val linkReplace = DOMAIN + "/@/$1"
-
   // Matches a lichess username with an '@' prefix if it is used as a single
   // word (i.e. preceded and followed by space or appropriate punctuation):
   // Yes: everyone says @ornicar is a pretty cool guy
@@ -46,14 +46,14 @@ final object RawHtml {
 
   private[this] val atUsernamePat = atUsernameRegex.pattern
 
-  def expandAtUser(text: String): List[String] = {
+  def expandAtUser(text: String)(implicit netDomain: config.NetDomain): List[String] = {
     val m = atUsernamePat.matcher(text)
     if (m.find) {
       var idx = 0
       val buf = List.newBuilder[String]
       do {
         if (idx < m.start) buf += text.substring(idx, m.start)
-        buf += DOMAIN + "/@/" + m.group(1)
+        buf += s"${netDomain}/@/${m.group(1)}"
         idx = m.end
       } while (m.find)
       if (idx < text.length) buf += text.substring(idx)
@@ -63,7 +63,13 @@ final object RawHtml {
 
   def hasLinks(text: String) = urlPattern.matcher(text).find
 
-  def addLinks(text: String, expandImg: Boolean = true): String =
+  type LinkRender = (String, String) => Option[Frag]
+
+  def addLinks(
+      text: String,
+      expandImg: Boolean = true,
+      linkRender: Option[LinkRender] = None
+  )(implicit netDomain: config.NetDomain): String =
     expandAtUser(text).map { expanded =>
       val m = urlPattern.matcher(expanded)
 
@@ -75,7 +81,7 @@ final object RawHtml {
 
         do {
           val start = m.start
-          escapeHtmlRaw(sb, sArr, lastAppendIdx, start)
+          escapeHtmlRawInPlace(sb, sArr, lastAppendIdx, start)
 
           val domainS = Math.max(m.start(1), start)
           val pathS   = m.start(2)
@@ -94,7 +100,7 @@ final object RawHtml {
             }
           )
 
-          val isTldInternal = DOMAIN == domain
+          val isTldInternal = netDomain.value == domain
 
           val csb = new jStringBuilder()
           if (!isTldInternal) csb.append(domain)
@@ -103,32 +109,33 @@ final object RawHtml {
             csb.append(sArr, pathS, end - pathS)
           }
 
-          val allButScheme = escapeHtmlRaw(csb.toString)
+          val allButScheme = escapeHtmlRaw(removeUrlTrackingParameters(csb.toString))
+          lazy val isHttp  = domainS - start == 7
+          lazy val url     = (if (isHttp) "http://" else "https://") + allButScheme
+          lazy val text    = if (isHttp) url else allButScheme
 
-          if (isTldInternal) {
-            sb.append(s"""<a href="${if (allButScheme.isEmpty) "/"
-              else allButScheme}">${allButScheme match {
-                case USER_LINK(user) => "@" + user
-                case _               => DOMAIN + allButScheme
-              }}</a>""")
-          } else {
-            val isHttp = domainS - start == 7
-            val url    = (if (isHttp) "http://" else "https://") + allButScheme
-            val text   = if (isHttp) url else allButScheme
-            val imgHtml = {
+          sb append {
+            if (isTldInternal)
+              linkRender flatMap { _(allButScheme, text).map(_.render) } getOrElse s"""<a href="${if (
+                  allButScheme.isEmpty
+                )
+                  "/"
+                else allButScheme}">${allButScheme match {
+                  case USER_LINK(user) => "@" + user
+                  case _               => s"${netDomain}$allButScheme"
+                }}</a>"""
+            else {
               if ((end < sArr.length && sArr(end) == '"') || !expandImg) None
               else imgUrl(url)
+            } getOrElse {
+              s"""<a rel="nofollow noopener noreferrer" href="$url" target="_blank">$text</a>"""
             }
-            sb.append(
-              imgHtml.getOrElse(
-                s"""<a rel="nofollow noopener noreferrer" href="$url" target="_blank">$text</a>"""
-              )
-            )
           }
+
           lastAppendIdx = end
         } while (m.find)
 
-        escapeHtmlRaw(sb, sArr, lastAppendIdx, sArr.length)
+        escapeHtmlRawInPlace(sb, sArr, lastAppendIdx, sArr.length)
         sb.toString
       }
     } match {
@@ -184,7 +191,19 @@ final object RawHtml {
     }
 
   private[this] val markdownLinkRegex = """\[([^]]++)\]\((https?://[^)]++)\)""".r
-
   def justMarkdownLinks(escapedHtml: String): String =
-    markdownLinkRegex.replaceAllIn(escapedHtml, """<a href="$2">$1</a>""")
+    markdownLinkRegex.replaceAllIn(
+      escapedHtml,
+      m => {
+        val content = Matcher.quoteReplacement(m group 1)
+        val href    = removeUrlTrackingParameters(m group 2)
+        s"""<a rel="nofollow noopener noreferrer" href="$href">$content</a>"""
+      }
+    )
+
+  private[this] val trackingParametersRegex =
+    """(?i)(?:\?|&(?:amp;)?)(?:utm\\?_\w+|gclid|gclsrc|\\?_ga)=\w+""".r
+  def removeUrlTrackingParameters(url: String): String =
+    trackingParametersRegex.replaceAllIn(url, "")
+
 }

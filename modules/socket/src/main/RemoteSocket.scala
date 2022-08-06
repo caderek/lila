@@ -1,6 +1,6 @@
 package lila.socket
 
-import akka.actor.{ ActorSystem, CoordinatedShutdown }
+import akka.actor.{ CoordinatedShutdown, Scheduler }
 import chess.{ Centis, Color }
 import io.lettuce.core._
 import io.lettuce.core.pubsub.{ StatefulRedisPubSubConnection => PubSub }
@@ -25,7 +25,7 @@ final class RemoteSocket(
     shutdown: CoordinatedShutdown
 )(implicit
     ec: scala.concurrent.ExecutionContext,
-    system: ActorSystem
+    scheduler: Scheduler
 ) {
 
   import RemoteSocket._, Protocol._
@@ -119,12 +119,12 @@ final class RemoteSocket(
     case UnFollow(u1, u2) => send(Out.unfollow(u1, u2))
   }
 
-  final class StoppableSender(conn: PubSub[String, String], channel: Channel) extends Sender {
-    def apply(msg: String): Unit               = if (!stopping) conn.async.publish(channel, msg).unit
-    def sticky(_id: String, msg: String): Unit = apply(msg)
+  final class StoppableSender(val conn: PubSub[String, String], channel: Channel) extends Sender {
+    def apply(msg: String)               = if (!stopping) send(channel, msg).unit
+    def sticky(_id: String, msg: String) = apply(msg)
   }
 
-  final class RoundRobinSender(conn: PubSub[String, String], channel: Channel, parallelism: Int)
+  final class RoundRobinSender(val conn: PubSub[String, String], channel: Channel, parallelism: Int)
       extends Sender {
     def apply(msg: String): Unit = publish(msg.hashCode.abs % parallelism, msg)
     // use the ID to select the channel, not the entire message
@@ -141,10 +141,14 @@ final class RemoteSocket(
   private val send: Send = makeSender("site-out").apply _
 
   def subscribe(channel: Channel, reader: In.Reader)(handler: Handler): Funit =
-    connectAndSubscribe(channel) { message =>
-      reader(RawMsg(message)) collect handler match {
-        case Some(_) => // processed
-        case None    => logger.warn(s"Unhandled $channel $message")
+    connectAndSubscribe(channel) { str =>
+      RawMsg(str) match {
+        case None => logger.error(s"Invalid $channel $str")
+        case Some(msg) =>
+          reader(msg) collect handler match {
+            case Some(_) => // processed
+            case None    => logger.warn(s"Unhandled $channel $str")
+          }
       }
     }
 
@@ -200,6 +204,9 @@ object RemoteSocket {
   trait Sender {
     def apply(msg: String): Unit
     def sticky(_id: String, msg: String): Unit
+
+    protected val conn: PubSub[String, String]
+    protected def send(channel: Channel, msg: String) = conn.async.publish(channel, msg)
   }
 
   object Protocol {
@@ -209,9 +216,11 @@ object RemoteSocket {
         f.applyOrElse(args.split(" ", nb), (_: Array[String]) => None)
       def all = args split ' '
     }
-    def RawMsg(msg: String): RawMsg = {
+    def RawMsg(msg: String): Option[RawMsg] = {
       val parts = msg.split(" ", 2)
-      new RawMsg(parts(0), ~parts.lift(1))
+      parts.headOption map {
+        new RawMsg(_, ~parts.lift(1))
+      }
     }
 
     trait In

@@ -113,7 +113,7 @@
   <string name="byCPL">Цікавае</string>
   <string name="openStudy">Адкрыць навучанне</string>
   <string name="enable">Уключыць</string>
-  <string name="bestMoveArrow">Паказваць лепшы ход</string>
+  <string name="bestMoveArrow">Паказваць стрэлкай найлепшы ход</string>
   <string name="evaluationGauge">Шкала ацэнкі</string>
   <string name="multipleLines">Дадатковыя хады</string>
   <string name="cpus">Працэсары</string>
@@ -400,6 +400,8 @@
   <string name="apply">Ужыць</string>
   <string name="save">Захаваць</string>
   <string name="leaderboard">Лепшыя гульцы</string>
+  <string name="screenshotCurrentPosition">Зрабіць здымак экрана з бягучай пазіцыяй</string>
+  <string name="gameAsGIF">Партыя ў фармаце GIF</string>
   <string name="pasteTheFenStringHere">Устаўце сюды радок у фармаце FEN</string>
   <string name="pasteThePgnStringHere">Устаўце сюды радок у фармаце PGN</string>
   <string name="orUploadPgnFile">Або загрузіце PGN файл</string>
@@ -488,6 +490,8 @@
   <string name="tournamentIsStarting">Турнір пачынаецца</string>
   <string name="tournamentPairingsAreNowClosed">Лёсаванне турніру скончана.</string>
   <string name="standByX">%s, ідзе лёсаванне. Напагатове!</string>
+  <string name="pause">Паўза</string>
+  <string name="resume">Працягнуць</string>
   <string name="youArePlaying">Вы ў гульні!</string>
   <string name="winRate">Працэнт перамог</string>
   <string name="berserkRate">Шаленства</string>
@@ -589,9 +593,9 @@
   <string name="letOtherPlayersInviteYouToStudy">Дазволіць іншым гульцам запрасіць вас на даследаванне</string>
   <string name="sound">Гук</string>
   <string name="none">Няма</string>
-  <string name="fast">Хутка</string>
-  <string name="normal">Нармальна</string>
-  <string name="slow">Павольна</string>
+  <string name="fast">Хуткая</string>
+  <string name="normal">Сярэдняя</string>
+  <string name="slow">Павольная</string>
   <string name="insideTheBoard">Унутры дошкі</string>
   <string name="outsideTheBoard">Па-за дошкай</string>
   <string name="onSlowGames">У павольных гульнях</string>
@@ -631,6 +635,7 @@
   <string name="community">Супольнасць</string>
   <string name="tools">Інструменты</string>
   <string name="increment">Прырост</string>
+  <string name="error.unknown">Недапушчальнае значэнне</string>
   <string name="error.required">Абавязковае поле</string>
   <string name="error.email">Гэта немагчымы адрас электронай пошты</string>
   <string name="error.email_acceptable">Гэты адрас электроннай пошты непрымальны. Калі ласка, пераправерце і паспрабуйце зноўку.</string>
@@ -805,13 +810,13 @@
   </plurals>
   <string name="practiceWithComputer">Трэніроўка з камп’ютарам</string>
   <string name="anotherWasX">Таксама можна: %s</string>
-  <string name="bestWasX">Лепшы ход: %s</string>
+  <string name="bestWasX">Найлепшы ход %s</string>
   <string name="youBrowsedAway">Вы выйшлі з прагляду</string>
   <string name="resumePractice">Працягнуць трэніроўку</string>
   <string name="theGameIsADraw">Гульня скончылася ўнічыю.</string>
   <string name="computerThinking">Камп’ютар думае...</string>
-  <string name="seeBestMove">Паказаць лепшы ход</string>
-  <string name="hideBestMove">Схаваць лепшы ход</string>
+  <string name="seeBestMove">Паказаць найлепшы ход</string>
+  <string name="hideBestMove">Схаваць найлепшы ход</string>
   <string name="getAHint">Атрымаць падказку</string>
   <string name="evaluatingYourMove">Ацэнка вашага ходу...</string>
   <string name="whiteWinsGame">Белыя перамаглі</string>

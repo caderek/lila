@@ -36,7 +36,8 @@ final class SwissApi(
     roundSocket: lila.round.RoundSocket
 )(implicit
     ec: scala.concurrent.ExecutionContext,
-    system: akka.actor.ActorSystem,
+    scheduler: akka.actor.Scheduler,
+    mat: akka.stream.Materializer,
     mode: play.api.Mode
 ) {
 
@@ -327,53 +328,36 @@ final class SwissApi(
       }
     }
 
-  private[swiss] def kickFromTeam(teamId: TeamID, userId: User.ID) =
-    colls.swiss.secondaryPreferred
-      .primitive[Swiss.Id]($doc("teamId" -> teamId, "featurable" -> true), "_id")
-      .flatMap { swissIds =>
-        colls.player.distinctEasy[Swiss.Id, Seq](
-          "s",
-          $inIds(swissIds.map { SwissPlayer.makeId(_, userId) }),
-          ReadPreference.secondaryPreferred
-        )
-      }
+  private[swiss] def leaveTeam(teamId: TeamID, userId: User.ID) =
+    joinedPlayableSwissIds(userId, List(teamId))
       .flatMap { kickFromSwissIds(userId, _) }
 
   private[swiss] def kickLame(userId: User.ID) =
     Bus
       .ask[List[TeamID]]("teamJoinedBy")(lila.hub.actorApi.team.TeamIdsJoinedBy(userId, _))
-      .flatMap { teamIds =>
-        colls.swiss.aggregateList(100) { framework =>
-          import framework._
-          Match($doc("teamId" $in teamIds, "featurable" -> true)) -> List(
-            PipelineOperator(
-              $doc(
-                "$lookup" -> $doc(
-                  "as"   -> "player",
-                  "from" -> colls.player.name,
-                  "let"  -> $doc("s" -> "$_id"),
-                  "pipeline" -> $arr(
-                    $doc(
-                      "$match" -> $doc(
-                        "$expr" -> $doc(
-                          "$and" -> $arr(
-                            $doc("$eq" -> $arr("$u", userId)),
-                            $doc("$eq" -> $arr("$s", "$$s"))
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            ),
-            Match("player" $ne $arr()),
-            Project($id(true))
-          )
-        }
+      .flatMap { joinedPlayableSwissIds(userId, _) }
+      .flatMap { kickFromSwissIds(userId, _) }
+
+  def joinedPlayableSwissIds(userId: User.ID, teamIds: List[TeamID]): Fu[List[Swiss.Id]] =
+    colls.swiss
+      .aggregateList(100, ReadPreference.secondaryPreferred) { framework =>
+        import framework._
+        Match($doc("teamId" $in teamIds, "featurable" -> true)) -> List(
+          PipelineOperator(
+            $lookup.pipeline(
+              as = "player",
+              from = colls.player.name,
+              local = "_id",
+              foreign = "s",
+              pipe = List($doc("$match" -> $doc("u" -> userId)))
+            )
+          ),
+          Match("player" $ne $arr()),
+          Limit(100),
+          Project($id(true))
+        )
       }
       .map(_.flatMap(_.getAsOpt[Swiss.Id]("_id")))
-      .flatMap { kickFromSwissIds(userId, _) }
 
   private def kickFromSwissIds(userId: User.ID, swissIds: Seq[Swiss.Id], forfeit: Boolean = false): Funit =
     swissIds.map { withdraw(_, userId, forfeit) }.sequenceFu.void
@@ -500,7 +484,7 @@ final class SwissApi(
       } >>- {
       systemChat(swiss.id, s"Tournament completed!")
       socket.reload(swiss.id)
-      system.scheduler
+      scheduler
         .scheduleOnce(10 seconds) {
           // we're delaying this to make sure the ranking has been recomputed
           // since doFinish is called by finishGame before that
@@ -599,7 +583,8 @@ final class SwissApi(
           .aggregateList(100) { framework =>
             import framework._
             Match($doc(f.status -> SwissPairing.ongoing)) -> List(
-              GroupField(f.swissId)("ids" -> PushField(f.id))
+              GroupField(f.swissId)("ids" -> PushField(f.id)),
+              Limit(100)
             )
           }
       }
@@ -644,23 +629,19 @@ final class SwissApi(
         import framework._
         Match($doc("finishedAt" $exists false, "nbPlayers" $gt 0, "teamId" $in teamIds)) -> List(
           PipelineOperator(
-            $doc(
-              "$lookup" -> $doc(
-                "from" -> colls.player.name,
-                "let"  -> $doc("s" -> "$_id"),
-                "pipeline" -> $arr(
-                  $doc(
-                    "$match" -> $doc(
-                      "$expr" -> $doc(
-                        "$and" -> $arr(
-                          $doc("$eq" -> $arr("$u", user.id)),
-                          $doc("$eq" -> $arr("$s", "$$s"))
-                        )
-                      )
+            $lookup.pipelineFull(
+              from = colls.player.name,
+              let = $doc("s" -> "$_id"),
+              as = "player",
+              pipe = List(
+                $doc(
+                  "$match" -> $expr(
+                    $and(
+                      $doc("$eq" -> $arr("$u", user.id)),
+                      $doc("$eq" -> $arr("$s", "$$s"))
                     )
                   )
-                ),
-                "as" -> "player"
+                )
               )
             )
           ),

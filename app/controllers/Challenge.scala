@@ -16,6 +16,7 @@ import lila.oauth.{ AccessToken, OAuthScope }
 import lila.setup.ApiConfig
 import lila.socket.Socket.SocketVersion
 import lila.user.{ User => UserModel }
+import play.api.mvc.RequestHeader
 
 final class Challenge(
     env: Env,
@@ -221,7 +222,7 @@ final class Challenge(
                   get("opponentToken", req).map(Bearer.apply) match {
                     case None => BadRequest(jsonError("The game can no longer be aborted")).fuccess
                     case Some(bearer) =>
-                      env.oAuth.server.auth(bearer, List(OAuthScope.Challenge.Write)) map {
+                      env.oAuth.server.auth(bearer, List(OAuthScope.Challenge.Write), req.some) map {
                         case Right(OAuthScope.Scoped(op, _)) if pov.opponent.isUser(op) =>
                           lila.common.Bus.publish(Tell(id, AbortForce), "roundSocket")
                           jsonOkResult
@@ -240,7 +241,7 @@ final class Challenge(
       import cats.implicits._
       val scopes = List(OAuthScope.Challenge.Write)
       (get("token1", req) map Bearer.apply, get("token2", req) map Bearer.apply).mapN {
-        env.oAuth.server.authBoth(scopes)
+        env.oAuth.server.authBoth(scopes, req)
       } ?? {
         _ flatMap {
           case Left(e) => handleScopedFail(scopes, e)
@@ -311,56 +312,55 @@ final class Challenge(
       }
     }
 
-  def apiCreate(userId: String) =
+  def apiCreate(username: String) =
     ScopedBody(_.Challenge.Write, _.Bot.Play, _.Board.Play) { implicit req => me =>
       implicit val lang = reqLang
-      !me.is(userId) ?? env.setup.forms.api
+      !me.is(username) ?? env.setup.forms.api
         .user(me)
         .bindFromRequest()
         .fold(
           newJsonFormError,
           config =>
             ChallengeIpRateLimit(HTTPRequest ipAddress req, cost = if (me.isApiHog) 0 else 1) {
-              env.user.repo enabledById userId.toLowerCase flatMap { destUser =>
-                val cost = destUser match {
-                  case _ if me.isApiHog         => 0
-                  case None                     => 2
-                  case Some(dest) if dest.isBot => 1
-                  case _                        => 5
-                }
-                BotChallengeIpRateLimit(HTTPRequest ipAddress req, cost = if (me.isBot) 1 else 0) {
-                  ChallengeUserRateLimit(me.id, cost = cost) {
-                    val challenge = makeOauthChallenge(config, me, destUser)
-                    (destUser, config.acceptByToken) match {
-                      case (Some(dest), Some(strToken)) =>
-                        apiChallengeAccept(dest, challenge, strToken)(me, config.message)
-                      case _ =>
-                        destUser ?? { env.challenge.granter.isDenied(me.some, _, config.perfType) } flatMap {
-                          case Some(denied) =>
-                            BadRequest(jsonError(lila.challenge.ChallengeDenied.translated(denied))).fuccess
-                          case _ =>
-                            env.challenge.api create challenge map {
-                              case true =>
-                                val json = env.challenge.jsonView
-                                  .show(challenge, SocketVersion(0), lila.challenge.Direction.Out.some)
-                                if (config.keepAliveStream)
-                                  apiC.sourceToNdJsonOption(
-                                    apiC.addKeepAlive(env.challenge.keepAliveStream(challenge, json))
-                                  )
-                                else JsonOk(json)
-                              case false =>
-                                BadRequest(jsonError("Challenge not created"))
-                            }
-                        } map (_ as JSON)
-                    }
+              env.user.repo enabledByName username flatMap {
+                case None => JsonBadRequest(jsonError(s"No such user: $username")).fuccess
+                case Some(destUser) =>
+                  val cost = if (me.isApiHog) 0 else if (destUser.isBot) 1 else 5
+                  BotChallengeIpRateLimit(HTTPRequest ipAddress req, cost = if (me.isBot) 1 else 0) {
+                    ChallengeUserRateLimit(me.id, cost = cost) {
+                      val challenge = makeOauthChallenge(config, me, destUser)
+                      config.acceptByToken match {
+                        case Some(strToken) =>
+                          apiChallengeAccept(destUser, challenge, strToken)(me, config.message)
+                        case _ =>
+                          env.challenge.granter.isDenied(me.some, destUser, config.perfType) flatMap {
+                            case Some(denied) =>
+                              JsonBadRequest(
+                                jsonError(lila.challenge.ChallengeDenied.translated(denied))
+                              ).fuccess
+                            case _ =>
+                              env.challenge.api create challenge map {
+                                case true =>
+                                  val json = env.challenge.jsonView
+                                    .show(challenge, SocketVersion(0), lila.challenge.Direction.Out.some)
+                                  if (config.keepAliveStream)
+                                    apiC.sourceToNdJsonOption(
+                                      apiC.addKeepAlive(env.challenge.keepAliveStream(challenge, json))
+                                    )
+                                  else JsonOk(json)
+                                case false =>
+                                  JsonBadRequest(jsonError("Challenge not created"))
+                              }
+                          }
+                      }
+                    }(rateLimitedFu)
                   }(rateLimitedFu)
-                }(rateLimitedFu)
               }
             }(rateLimitedFu)
         )
     }
 
-  private def makeOauthChallenge(config: ApiConfig, orig: UserModel, dest: Option[UserModel]) = {
+  private def makeOauthChallenge(config: ApiConfig, orig: UserModel, dest: UserModel) = {
     import lila.challenge.Challenge._
     val timeControl = TimeControl.make(config.clock, config.days)
     lila.challenge.Challenge
@@ -371,7 +371,7 @@ final class Challenge(
         mode = config.mode,
         color = config.color.name,
         challenger = ChallengeModel.toRegistered(config.variant, timeControl)(orig),
-        destUser = dest,
+        destUser = dest.some,
         rematchOf = none
       )
   }
@@ -380,10 +380,11 @@ final class Challenge(
       dest: UserModel,
       challenge: lila.challenge.Challenge,
       strToken: String
-  )(managedBy: lila.user.User, message: Option[Template]) =
+  )(managedBy: lila.user.User, message: Option[Template])(implicit req: RequestHeader) =
     env.oAuth.server.auth(
       Bearer(strToken),
-      List(lila.oauth.OAuthScope.Challenge.Write)
+      List(lila.oauth.OAuthScope.Challenge.Write),
+      req.some
     ) flatMap {
       _.fold(
         err => BadRequest(jsonError(err.message)).fuccess,

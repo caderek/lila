@@ -17,6 +17,8 @@
   <string name="stalemate">ජය පැරදුමෙන් තොර</string>
   <string name="white">සුදු</string>
   <string name="black">කළු</string>
+  <string name="asWhite">සුදු ‌‌ලෙස</string>
+  <string name="asBlack">කලු ලෙස</string>
   <string name="randomColor">අහඹු පැත්ත</string>
   <string name="createAGame">ක්‍රීඩාවක් නිර්මාණය කරන්න</string>
   <string name="whiteIsVictorious">සුදු ජයග්‍රාහී වේ</string>
@@ -233,6 +235,8 @@
   <string name="inbox">එන ලිපි</string>
   <string name="chatRoom">කතාබස් පුවරුව</string>
   <string name="loginToChat">කතාබස් කිරීමට පුරනය වන්න</string>
+  <string name="youHaveBeenTimedOut">ඔබ චෙස් ගේම ගසනවා
+You are playing chess.</string>
   <string name="spectatorRoom">ප්‍රේක්ෂක කාමරය</string>
   <string name="composeMessage">පණිවිඩය රචනා කරන්න</string>
   <string name="subject">විෂයය</string>

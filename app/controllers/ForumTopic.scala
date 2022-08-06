@@ -75,7 +75,7 @@ final class ForumTopic(env: Env) extends LilaController(env) with ForumControlle
             form <- ctx.me.ifTrue(
               canWrite && topic.open && !topic.isOld
             ) ?? { me => forms.postWithCaptcha(me, inOwnTeam) map some }
-            _ <- env.user.lightUserApi preloadMany posts.currentPageResults.flatMap(_.userId)
+            _ <- env.user.lightUserApi preloadMany posts.currentPageResults.flatMap(_.post.userId)
             res <-
               if (canRead)
                 Ok(html.forum.topic.show(categ, topic, posts, form, unsub, canModCateg = canModCateg)).fuccess
@@ -87,7 +87,7 @@ final class ForumTopic(env: Env) extends LilaController(env) with ForumControlle
 
   def close(categSlug: String, slug: String) =
     Auth { implicit ctx => me =>
-      CategGrantMod(categSlug) {
+      TopicGrantModBySlug(categSlug, me, slug) {
         OptionFuRedirect(topicApi.show(categSlug, slug, 1, ctx.me)) { case (categ, topic, pag) =>
           topicApi.toggleClose(categ, topic, Holder(me)) inject
             routes.ForumTopic.show(categSlug, slug, pag.nbPages)

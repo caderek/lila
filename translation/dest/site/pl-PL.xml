@@ -400,6 +400,8 @@
   <string name="apply">Zastosuj</string>
   <string name="save">Zapisz</string>
   <string name="leaderboard">Najlepsi gracze</string>
+  <string name="screenshotCurrentPosition">Zrzut ekranu aktualnej pozycji</string>
+  <string name="gameAsGIF">Zapisz jako GIF</string>
   <string name="pasteTheFenStringHere">Wklej tutaj pozycję w formacie FEN</string>
   <string name="pasteThePgnStringHere">Wklej poniżej przebieg partii w formacie PGN</string>
   <string name="orUploadPgnFile">lub wgraj plik PGN</string>
@@ -488,6 +490,8 @@
   <string name="tournamentIsStarting">Rozpoczęcie turnieju</string>
   <string name="tournamentPairingsAreNowClosed">Zakończono kojarzenie par.</string>
   <string name="standByX">Parowanie graczy, przygotuj się do gry, %s!</string>
+  <string name="pause">Pauza</string>
+  <string name="resume">Wznów</string>
   <string name="youArePlaying">Grasz!</string>
   <string name="winRate">Współczynnik zwycięstw</string>
   <string name="berserkRate">Berserków</string>
@@ -522,6 +526,10 @@
   <string name="socialMediaLinks">Linki do mediów społecznościowych</string>
   <string name="oneUrlPerLine">Jeden adres URL na linię.</string>
   <string name="inlineNotation">Notacja ciągła</string>
+  <string name="savingMoves">Tymczasowe miejsce zapisu ruchów</string>
+  <string name="savingMovesHelp">Zawsze przechowujemy Twoje warianty w pamięci podręcznej przeglądarki.</string>
+  <string name="makeAStudy">Aby bezpiecznie zapamiętać i udostępniać, rozważ stworzenie opracowania.</string>
+  <string name="clearSavedMoves">Usuń ruchy</string>
   <string name="previouslyOnLichessTV">Poprzednio w Lichess TV</string>
   <string name="onlinePlayers">Gracze online</string>
   <string name="activePlayers">Aktywni gracze</string>
@@ -631,6 +639,7 @@
   <string name="community">Społeczność</string>
   <string name="tools">Narzędzia</string>
   <string name="increment">Czas dodawany</string>
+  <string name="error.unknown">Nieprawidłowa wartość</string>
   <string name="error.required">To pole jest wymagane</string>
   <string name="error.email">Ten adres e-mail jest nieprawidłowy</string>
   <string name="error.email_acceptable">Ten adres e-mail jest niedopuszczalny. Sprawdź go i spróbuj ponownie.</string>

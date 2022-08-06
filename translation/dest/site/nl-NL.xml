@@ -9,7 +9,7 @@
   <string name="yourTurn">U bent aan zet</string>
   <string name="aiNameLevelAiLevel">%1$s niveau %2$s</string>
   <string name="level">Niveau</string>
-  <string name="strength">Sterkte</string>
+  <string name="strength">Speelsterkte</string>
   <string name="toggleTheChat">Chat aan-/uitzetten</string>
   <string name="chat">Chat</string>
   <string name="resign">Geef op</string>
@@ -348,6 +348,8 @@
   <string name="apply">Toepassen</string>
   <string name="save">Bewaar</string>
   <string name="leaderboard">Ranglijst</string>
+  <string name="screenshotCurrentPosition">Schermafbeelding huidige stelling</string>
+  <string name="gameAsGIF">Download partij als GIF</string>
   <string name="pasteTheFenStringHere">Plak de FEN-code hier</string>
   <string name="pasteThePgnStringHere">Plak de PGN-code hier</string>
   <string name="orUploadPgnFile">Of upload een PGN-bestand</string>
@@ -426,6 +428,8 @@
   <string name="tournamentIsStarting">Het toernooi begint</string>
   <string name="tournamentPairingsAreNowClosed">De toernooiparingen zijn nu gesloten.</string>
   <string name="standByX">Sta klaar %s, spelers worden gepaard, maak je gereed!</string>
+  <string name="pause">Pauzeren</string>
+  <string name="resume">Hervatten</string>
   <string name="youArePlaying">Je bent aan het spelen!</string>
   <string name="winRate">Win percentage</string>
   <string name="berserkRate">Berserk-percentage</string>
@@ -460,6 +464,10 @@
   <string name="socialMediaLinks">Links naar sociale media</string>
   <string name="oneUrlPerLine">Eén URL per regel.</string>
   <string name="inlineNotation">Geïntegreerde notatie</string>
+  <string name="savingMoves">Tijdelijke zettenopslag</string>
+  <string name="savingMovesHelp">We slaan je varianten op in de browser-cache.</string>
+  <string name="makeAStudy">Om ze te bewaren en te delen, overweeg het maken van een studie.</string>
+  <string name="clearSavedMoves">Zetten wissen</string>
   <string name="previouslyOnLichessTV">Voorheen op Lichess TV</string>
   <string name="onlinePlayers">Online spelers</string>
   <string name="activePlayers">Actieve spelers</string>
@@ -563,6 +571,7 @@
   <string name="community">Gemeenschap</string>
   <string name="tools">Gereedschap</string>
   <string name="increment">Extra tijd</string>
+  <string name="error.unknown">Ongeldige waarde</string>
   <string name="error.required">Dit invullen is verplicht</string>
   <string name="error.email">Dit e-mailadres is ongeldig</string>
   <string name="error.email_acceptable">Dit e-mailadres is niet acceptabel. Controleer het nogmaals en probeer het opnieuw.</string>

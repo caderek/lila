@@ -6,7 +6,7 @@ interface Lichess {
   storage: LichessStorageHelper;
   tempStorage: LichessStorageHelper;
   once(key: string, mod?: 'always'): boolean;
-  powertip: any;
+  powertip: LichessPowertip;
   clockWidget(el: HTMLElement, opts: { time: number; pause?: boolean }): void;
   spinnerHtml: string;
   assetUrl(url: string, opts?: AssetUrlOpts): string;
@@ -34,6 +34,7 @@ interface Lichess {
   studyTour(study: Study): void;
   studyTourChapter(study: Study): void;
 
+  siteI18n: I18nDict;
   trans(i18n: I18nDict): Trans;
   quantity(n: number): 'zero' | 'one' | 'few' | 'many' | 'other';
 
@@ -59,7 +60,6 @@ interface Lichess {
   };
 
   timeago(date: number | Date): string;
-  timeagoLocale(a: number, b: number, c: number): any;
   dateFormat: () => (date: Date) => string;
 
   // misc
@@ -79,6 +79,14 @@ type I18nKey = string;
 type RedirectTo = string | { url: string; cookie: Cookie };
 
 type UserComplete = (opts: UserCompleteOpts) => void;
+
+interface LichessPowertip {
+  watchMouse(): void;
+  manualGameIn(parent: HTMLElement): void;
+  manualGame(el: HTMLElement): void;
+  manualUser(el: HTMLElement): void;
+  manualUserIn(parent: HTMLElement): void;
+}
 
 interface UserCompleteOpts {
   input: HTMLInputElement;
@@ -242,13 +250,15 @@ interface Window {
   readonly LichessFlatpickr: (element: Element, opts: any) => any;
   readonly LichessNotify: (element: any, opts: any) => any;
   readonly LichessChallenge: (element: any, opts: any) => any;
-  readonly LichessDasher: (element: any, opts: any) => any;
+  readonly LichessDasher: (element: any) => any;
   readonly LichessAnalyse: any;
   readonly LichessCli: any;
   readonly LichessRound: any;
   readonly LichessRoundNvui?: Nvui;
-  readonly LichessAnalyseNvui?: Nvui;
   readonly LichessPuzzleNvui?: Nvui;
+  readonly LichessAnalyseNvui?: (ctrl: any) => {
+    render(): any;
+  };
   readonly LichessChartGame: {
     acpl: {
       (data: any, mainline: any[], trans: Trans, el: HTMLElement): Promise<void>;
@@ -268,6 +278,10 @@ interface Window {
   readonly Sortable: any;
   readonly Peer: any;
   readonly Highcharts: any;
+  readonly LilaLpv: {
+    autostart(): void;
+    loadPgnAndStart(el: HTMLElement, url: string, opts: any): Promise<void>;
+  };
 
   readonly Palantir: unknown;
   readonly passwordComplexity: unknown;
@@ -280,6 +294,7 @@ interface Study {
   userId?: string | null;
   isContrib?: boolean;
   isOwner?: boolean;
+  closeActionMenu?(): void;
   setTab(tab: string): void;
 }
 
@@ -352,7 +367,7 @@ interface Variant {
 interface Paginator<A> {
   currentPage: number;
   maxPerPage: number;
-  currentPageResults: Array<A>;
+  currentPageResults: A[];
   nbResults: number;
   previousPage?: number;
   nextPage?: number;

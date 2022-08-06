@@ -25,8 +25,6 @@ object insight {
       title = trans.insight.xChessInsights.txt(u.username),
       moreJs = frag(
         highchartsLatestTag,
-        jsAt("javascripts/vendor/jquery.min.js"),
-        jsAt("javascripts/vendor/multiple-select.min.js"),
         jsModule("insight"),
         jsTag("insight-refresh.js"),
         embedJsUnsafeLoadThen(

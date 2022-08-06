@@ -18,6 +18,7 @@ import lila.notify.Notification.Notifies
 import lila.oauth.{ OAuthScope, OAuthServer }
 import lila.security.{ AppealUser, FingerPrintedUser, Granter, Permission }
 import lila.user.{ Holder, User => UserModel, UserContext }
+import lila.common.config
 
 abstract private[controllers] class LilaController(val env: Env)
     extends BaseController
@@ -63,6 +64,7 @@ abstract private[controllers] class LilaController(val env: Env)
   implicit def ctxLang(implicit ctx: Context)         = ctx.lang
   implicit def ctxReq(implicit ctx: Context)          = ctx.req
   implicit def reqConfig(implicit req: RequestHeader) = ui.EmbedConfig(req)
+  implicit def netDomain                              = env.net.domain
   def reqLang(implicit req: RequestHeader)            = I18nLangPicker(req)
 
   protected def EnableSharedArrayBuffer(res: Result)(implicit req: RequestHeader): Result =
@@ -372,6 +374,7 @@ abstract private[controllers] class LilaController(val env: Env)
   protected def JsonOk(body: JsValue): Result             = Ok(body) as JSON
   protected def JsonOk[A: Writes](body: A): Result        = Ok(Json toJson body) as JSON
   protected def JsonOk[A: Writes](fua: Fu[A]): Fu[Result] = fua dmap { JsonOk(_) }
+  protected def JsonBadRequest(body: JsValue): Result     = BadRequest(body) as JSON
 
   protected val jsonOkBody   = Json.obj("ok" -> true)
   protected val jsonOkResult = JsonOk(jsonOkBody)
@@ -447,12 +450,11 @@ abstract private[controllers] class LilaController(val env: Env)
       api = _ => notFoundJson("Resource not found")
     )
 
-  def notFoundJson(msg: String = "Not found"): Fu[Result] =
-    fuccess {
-      NotFound(jsonError(msg))
-    }
-
   def jsonError[A: Writes](err: A): JsObject = Json.obj("error" -> err)
+
+  def notFoundJsonSync(msg: String = "Not found"): Result = NotFound(jsonError(msg)) as JSON
+
+  def notFoundJson(msg: String = "Not found"): Fu[Result] = fuccess(notFoundJsonSync(msg))
 
   def notForBotAccounts =
     BadRequest(
@@ -612,21 +614,16 @@ abstract private[controllers] class LilaController(val env: Env)
 
   protected def Reasonable(
       page: Int,
-      max: Int = 40,
+      max: config.Max = config.Max(40),
       errorPage: => Fu[Result] = BadRequest("resource too old").fuccess
   )(result: => Fu[Result]): Fu[Result] =
-    if (page < max && page > 0) result else errorPage
+    if (max > page && page > 0) result else errorPage
 
   protected def NotForKids(f: => Fu[Result])(implicit ctx: Context) =
     if (ctx.kid) notFound else f
 
   protected def OnlyHumans(result: => Fu[Result])(implicit ctx: lila.api.Context) =
     if (HTTPRequest isCrawler ctx.req) notFound else result
-
-  protected def OnlyHumansAndFacebookOrTwitter(result: => Fu[Result])(implicit ctx: lila.api.Context) =
-    if (HTTPRequest isFacebookOrTwitterBot ctx.req) result
-    else if (HTTPRequest isCrawler ctx.req) fuccess(NotFound)
-    else result
 
   protected def NotManaged(result: => Fu[Result])(implicit ctx: Context) =
     ctx.me.??(env.clas.api.student.isManaged) flatMap {
@@ -675,12 +672,6 @@ abstract private[controllers] class LilaController(val env: Env)
 
   protected def pageHit(req: RequestHeader): Unit =
     if (HTTPRequest isHuman req) lila.mon.http.path(req.path).increment().unit
-
-  protected def makeCustomResult(status: Int, reasonPhrase: String) =
-    Result(
-      header = new ResponseHeader(status, reasonPhrase = reasonPhrase.some).pp,
-      body = play.api.http.HttpEntity.NoEntity
-    )
 
   protected def pageHit(implicit ctx: lila.api.Context): Unit = pageHit(ctx.req)
 

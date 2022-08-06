@@ -10,6 +10,7 @@ final class Dev(env: Env) extends LilaController(env) {
   private lazy val settingsList = List[lila.memo.SettingStore[_]](
     env.security.ugcArmedSetting,
     env.security.spamKeywordsSetting,
+    env.oAuth.originBlocklistSetting,
     env.mailer.mailerSecondaryPermilleSetting,
     env.irwin.irwinApi.thresholds,
     env.irwin.kaladinApi.thresholds,
@@ -23,7 +24,6 @@ final class Dev(env: Env) extends LilaController(env) {
     env.rating.ratingFactorsSetting,
     env.plan.donationGoalSetting,
     env.plan.paymentMethodsSetting,
-    env.plan.payPalCheckoutSetting,
     env.apiTimelineSetting,
     env.apiExplorerGamesPerSecond,
     env.fishnet.openingBookDepth,
@@ -32,7 +32,8 @@ final class Dev(env: Env) extends LilaController(env) {
     env.prizeTournamentMakers,
     env.pieceImageExternal,
     env.evalCache.enable,
-    env.tournament.reloadEndpointSetting
+    env.tournament.reloadEndpointSetting,
+    env.tutor.nbAnalysisSetting
   )
 
   def settings =
@@ -41,14 +42,19 @@ final class Dev(env: Env) extends LilaController(env) {
     }
 
   def settingsPost(id: String) =
-    SecureBody(_.Settings) { implicit ctx => _ =>
+    SecureBody(_.Settings) { implicit ctx => me =>
       settingsList.find(_.id == id) ?? { setting =>
         implicit val req = ctx.body
         setting.form
           .bindFromRequest()
           .fold(
             _ => BadRequest(html.dev.settings(settingsList)).fuccess,
-            v => setting.setString(v.toString) inject Redirect(routes.Dev.settings)
+            v => {
+              lila
+                .log("setting")
+                .info(s"${me.user.username} changes $id from ${setting.get()} to ${v.toString}")
+              setting.setString(v.toString) inject Redirect(routes.Dev.settings)
+            }
           )
       }
     }

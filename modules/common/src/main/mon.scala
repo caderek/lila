@@ -131,7 +131,6 @@ object mon {
     object api {
       val player  = timer("round.api").withTag("endpoint", "player")
       val watcher = timer("round.api").withTag("endpoint", "watcher")
-      val embed   = timer("round.api").withTag("endpoint", "embed")
     }
     object forecast {
       val create = counter("round.forecast.create").withoutTags()
@@ -192,8 +191,18 @@ object mon {
     val notification = counter("timeline.notification").withoutTags()
   }
   object insight {
-    val request = future("insight.request.time")
-    val index   = future("insight.index.time")
+    val user  = future("insight.request.time", "user")
+    val peers = future("insight.request.time", "peer")
+    val index = future("insight.index.time")
+  }
+  object tutor {
+    def buildSegment(segment: String) = future("tutor.build.segment", segment)
+    def buildFull                     = future("tutor.build.full")
+    def askMine                       = askAs("mine") _
+    def askPeer                       = askAs("peer") _
+    def buildTimeout                  = counter("tutor.build.timeout").withoutTags()
+    private def askAs(as: String)(question: String, perf: String) =
+      future("tutor.insight.ask", Map("question" -> question, "perf" -> perf, "as" -> as))
   }
   object search {
     def time(op: String, index: String, success: Boolean) =
@@ -342,6 +351,8 @@ object mon {
     object hCaptcha {
       def hit(client: String, result: String) =
         counter("hcaptcha.hit").withTags(Map("client" -> client, "result" -> result))
+      def form(client: String, result: String) =
+        counter("hcaptcha.form").withTags(Map("client" -> client, "result" -> result))
     }
   }
   object tv {
@@ -495,9 +506,9 @@ object mon {
         def batch(nb: Int)      = timer("puzzle.selector.anon.batch").withTag("nb", nb)
         def vote(theme: String) = histogram("puzzle.selector.anon.vote").withTag("theme", theme)
       }
-      def nextPuzzleResult(theme: String, difficulty: String, result: String) =
+      def nextPuzzleResult(theme: String, difficulty: String, color: String, result: String) =
         timer("puzzle.selector.user.puzzleResult").withTags(
-          Map("theme" -> theme, "difficulty" -> difficulty, "result" -> result)
+          Map("theme" -> theme, "difficulty" -> difficulty, "color" -> color, "result" -> result)
         )
     }
     object path {
@@ -745,6 +756,14 @@ object mon {
   object picfit {
     def uploadTime(user: String) = future("picfit.upload.time", Map("user" -> user))
     def uploadSize(user: String) = histogram("picfit.upload.size").withTag("user", user)
+  }
+  class executor(name: String) {
+    val queuedSubmissions = histogram("executor.queuedSubmissions").withTag("name", name)
+    val queuedTasks       = histogram("executor.queuedTasks").withTag("name", name)
+    val poolSize          = histogram("executor.poolSize").withTag("name", name)
+    val activeThreads     = histogram("executor.activeThreads").withTag("name", name)
+    val runningThreads    = histogram("executor.runningThreads").withTag("name", name)
+    val steals            = gauge("executor.steals").withTag("name", name)
   }
 
   def chronoSync[A] = lila.common.Chronometer.syncMon[A] _

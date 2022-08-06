@@ -11,6 +11,7 @@ case class PuzzleStreak(ids: String, first: Puzzle)
 final class PuzzleStreakApi(colls: PuzzleColls, cacheApi: CacheApi)(implicit ec: ExecutionContext) {
 
   import BsonHandlers._
+  import lila.puzzle.PuzzlePath.sep
 
   def apply: Fu[Option[PuzzleStreak]] = current.get {}
 
@@ -50,8 +51,8 @@ final class PuzzleStreakApi(colls: PuzzleColls, cacheApi: CacheApi)(implicit ec:
                   rating.toString -> List(
                     Match(
                       $doc(
-                        "min" $lte f"${theme}_${tier}_${rating}%04d",
-                        "max" $gte f"${theme}_${tier}_${rating}%04d"
+                        "min" $lte f"${theme}${sep}${tier}${sep}${rating}%04d",
+                        "max" $gte f"${theme}${sep}${tier}${sep}${rating}%04d"
                       )
                     ),
                     Sample(samples),
@@ -60,24 +61,12 @@ final class PuzzleStreakApi(colls: PuzzleColls, cacheApi: CacheApi)(implicit ec:
                     // ensure we have enough after filtering deviation
                     Sample(nbPuzzles * 4),
                     PipelineOperator(
-                      $doc(
-                        "$lookup" -> $doc(
-                          "from" -> colls.puzzle.name.value,
-                          "as"   -> "puzzle",
-                          "let"  -> $doc("id" -> "$ids"),
-                          "pipeline" -> $arr(
-                            $doc(
-                              "$match" -> $doc(
-                                "$expr" -> $doc(
-                                  "$and" -> $arr(
-                                    $doc("$eq"  -> $arr("$_id", "$$id")),
-                                    $doc("$lte" -> $arr("$glicko.d", deviation))
-                                  )
-                                )
-                              )
-                            )
-                          )
-                        )
+                      $lookup.pipeline(
+                        from = colls.puzzle,
+                        as = "puzzle",
+                        local = "ids",
+                        foreign = "_id",
+                        pipe = List($doc("$match" -> $doc("glicko.d" $lte deviation)))
                       )
                     ),
                     UnwindField("puzzle"),
@@ -89,7 +78,8 @@ final class PuzzleStreakApi(colls: PuzzleColls, cacheApi: CacheApi)(implicit ec:
                 Project($doc("all" -> $doc("$setUnion" -> buckets.map(r => s"$$${r._1}")))),
                 UnwindField("all"),
                 ReplaceRootField("all"),
-                Sort(Ascending("glicko.r"))
+                Sort(Ascending("glicko.r")),
+                Limit(poolSize)
               )
             }.map {
               _.flatMap(PuzzleBSONReader.readOpt)

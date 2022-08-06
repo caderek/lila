@@ -10,6 +10,7 @@ import { opposite, parseUci } from 'chessops/util';
 import { parseFen, makeBoardFen } from 'chessops/fen';
 import { renderEval } from './util';
 import { setupPosition } from 'chessops/variant';
+import { uciToMove } from 'chessground/util';
 
 let gaugeLast = 0;
 const gaugeTicks: VNode[] = [...Array(8).keys()].map(i =>
@@ -79,14 +80,19 @@ function threatButton(ctrl: ParentCtrl): VNode | null {
 }
 
 function engineName(ctrl: CevalCtrl): VNode[] {
-  const version = ctrl.engineName();
   return [
-    h(
-      'span',
-      { attrs: { title: version || '' } },
-      ctrl.technology == 'nnue' ? 'Stockfish 14+' : ctrl.technology == 'hce' ? 'Stockfish 11+' : 'Stockfish 10+'
-    ),
-    ctrl.technology == 'nnue'
+    h('span', { attrs: { title: ctrl.longEngineName() || '' } }, ctrl.engineName),
+    ctrl.technology == 'external'
+      ? h(
+          'span.technology.good',
+          {
+            attrs: {
+              title: 'Engine running outside of the browser',
+            },
+          },
+          'EXTERNAL'
+        )
+      : ctrl.technology == 'nnue'
       ? h(
           'span.technology.good',
           {
@@ -303,7 +309,7 @@ function checkHover(el: HTMLElement, instance: CevalCtrl): void {
 export function renderPvs(ctrl: ParentCtrl): VNode | undefined {
   const instance = ctrl.getCeval();
   if (!instance.allowed() || !instance.possible || !instance.enabled()) return;
-  const multiPv = parseInt(instance.multiPv()),
+  const multiPv = instance.multiPv(),
     node = ctrl.getNode(),
     setup = parseFen(node.fen).unwrap();
   let pvs: Tree.PvData[],
@@ -460,11 +466,10 @@ function renderPvBoard(ctrl: ParentCtrl): VNode | undefined {
     return;
   }
   const { fen, uci } = pvBoard;
-  const lastMove = uci[1] === '@' ? [uci.slice(2)] : [uci.slice(0, 2), uci.slice(2, 4)];
   const orientation = ctrl.getOrientation();
   const cgConfig = {
     fen,
-    lastMove,
+    lastMove: uciToMove(uci),
     orientation,
     coordinates: false,
     viewOnly: true,

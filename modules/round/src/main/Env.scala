@@ -16,7 +16,9 @@ import lila.hub.actorApi.simul.GetHostIds
 import lila.hub.actors
 import lila.memo.SettingStore
 import lila.memo.SettingStore.Strings._
+import lila.memo.SettingStore.Regex._
 import lila.user.User
+import scala.util.matching.Regex
 
 @Module
 private class RoundConfig(
@@ -50,6 +52,7 @@ final class Env(
     evalCache: lila.evalCache.EvalCacheApi,
     remoteSocketApi: lila.socket.RemoteSocket,
     isBotSync: lila.common.LightUser.IsBotSync,
+    lightUserGet: lila.common.LightUser.Getter,
     lightUserSync: lila.common.LightUser.GetterSync,
     ircApi: lila.irc.IrcApi,
     settingStore: lila.memo.SettingStore.Builder,
@@ -132,15 +135,15 @@ final class Env(
 
   scheduler.scheduleAtFixedRate(10 minute, 10 minute) { correspondenceEmail.tick _ }
 
-  val selfReportEndGame = settingStore[Strings](
+  val selfReportEndGame = settingStore[Regex](
     "selfReportEndGame",
-    default = Strings(Nil),
+    default = "-".r,
     text = "Self reports that end the game".some
   ).taggedWith[SelfReportEndGame]
 
-  val selfReportMarkUser = settingStore[Strings](
+  val selfReportMarkUser = settingStore[Regex](
     "selfReportMarkUser",
-    default = Strings(Nil),
+    default = "-".r,
     text = "Self reports that mark the user".some
   ).taggedWith[SelfReportMarkUser]
 

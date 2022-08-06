@@ -1,5 +1,6 @@
 package lila.puzzle
 
+import chess.Color
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
@@ -16,28 +17,36 @@ final class PuzzleAnon(
 
   import BsonHandlers._
 
-  def getOneFor(theme: PuzzleTheme.Key): Fu[Option[Puzzle]] =
+  def getOneFor(angle: PuzzleAngle, color: Option[Color]): Fu[Option[Puzzle]] =
     pool
-      .get(theme)
-      .map(ThreadLocalRandom.oneOf)
-      .mon(_.puzzle.selector.anon.time(theme.value))
+      .get(angle)
+      .map(color.fold[Vector[Puzzle] => Option[Puzzle]](ThreadLocalRandom.oneOf)(selectWithColor))
+      .mon(_.puzzle.selector.anon.time(angle.key))
       .addEffect {
         _ foreach { puzzle =>
-          lila.mon.puzzle.selector.anon.vote(theme.value).record(100 + math.round(puzzle.vote * 100))
+          lila.mon.puzzle.selector.anon.vote(angle.key).record(100 + math.round(puzzle.vote * 100))
         }
       }
 
+  private def selectWithColor(color: Color)(puzzles: Vector[Puzzle]): Option[Puzzle] = {
+    def nextTry(attempts: Int): Option[Puzzle] =
+      if (attempts < 10)
+        ThreadLocalRandom oneOf puzzles filter (_.color == color) orElse nextTry(attempts + 1)
+      else ThreadLocalRandom oneOf puzzles.filter(_.color == color)
+    nextTry(1)
+  }
+
   def getBatchFor(nb: Int): Fu[Vector[Puzzle]] = {
-    pool get PuzzleTheme.mix.key map (_ take nb)
+    pool get PuzzleAngle.mix map (_ take nb)
   }.mon(_.puzzle.selector.anon.batch(nb))
 
   private val poolSize = 150
 
   private val pool =
-    cacheApi[PuzzleTheme.Key, Vector[Puzzle]](initialCapacity = 64, name = "puzzle.byTheme.anon") {
+    cacheApi[PuzzleAngle, Vector[Puzzle]](initialCapacity = 64, name = "puzzle.byTheme.anon") {
       _.expireAfterWrite(1 minute)
-        .buildAsyncFuture { theme =>
-          countApi byTheme theme flatMap { count =>
+        .buildAsyncFuture { angle =>
+          countApi byAngle angle flatMap { count =>
             val tier =
               if (count > 5000) PuzzleTier.Top
               else if (count > 2000) PuzzleTier.Good
@@ -54,7 +63,7 @@ final class PuzzleAnon(
             colls.path {
               _.aggregateList(poolSize) { framework =>
                 import framework._
-                Match(pathApi.select(theme, tier, ratingRange)) -> List(
+                Match(pathApi.select(angle, tier, ratingRange)) -> List(
                   Sample(pathSampleSize),
                   Project($doc("puzzleId" -> "$ids", "_id" -> false)),
                   Unwind("puzzleId"),

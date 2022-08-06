@@ -34,6 +34,7 @@ final class TournamentRepo(val coll: Coll, playerCollName: CollName)(implicit
   private[tournament] val selectUnique = $doc("schedule.freq" -> "unique")
 
   def byId(id: Tournament.ID): Fu[Option[Tournament]] = coll.byId[Tournament](id)
+  def exists(id: Tournament.ID): Fu[Boolean]          = coll.exists($id(id))
 
   def uniqueById(id: Tournament.ID): Fu[Option[Tournament]] =
     coll.one[Tournament]($id(id) ++ selectUnique)
@@ -81,25 +82,21 @@ final class TournamentRepo(val coll: Coll, playerCollName: CollName)(implicit
     )
 
   private def lookupPlayer(userId: User.ID, project: Option[Bdoc]) =
-    $doc(
-      "$lookup" -> $doc(
-        "from" -> playerCollName.value,
-        "let"  -> $doc("tid" -> "$_id"),
-        "pipeline" -> $arr(
-          $doc(
-            "$match" -> $doc(
-              "$expr" -> $doc(
-                "$and" -> $arr(
-                  $doc("$eq" -> $arr("$uid", userId)),
-                  $doc("$eq" -> $arr("$tid", "$$tid"))
-                )
-              )
+    $lookup.pipelineFull(
+      from = playerCollName.value,
+      as = "player",
+      let = $doc("tid" -> "$_id"),
+      pipe = List(
+        $doc(
+          "$match" -> $expr(
+            $and(
+              $doc("$eq" -> $arr("$uid", userId)),
+              $doc("$eq" -> $arr("$tid", "$$tid"))
             )
-          ),
-          project.map { p => $doc(s"$$project" -> p) }
-        ),
-        "as" -> "player"
-      )
+          )
+        ).some,
+        project.map { p => $doc(s"$$project" -> p) }
+      ).flatten
     )
 
   private[tournament] def upcomingAdapterExpensiveCacheMe(userId: User.ID, max: Int) =
@@ -226,7 +223,7 @@ final class TournamentRepo(val coll: Coll, playerCollName: CollName)(implicit
 
   private[tournament] def soonStarting(from: DateTime, to: DateTime, notIds: Iterable[Tournament.ID]) =
     coll
-      .find(createdSelect ++ $doc("startsAt" $gt from $lt to, "_id" $nin notIds))
+      .find(createdSelect ++ $doc("nbPlayers" $gt 0, "startsAt" $gt from $lt to, "_id" $nin notIds))
       .cursor[Tournament]()
       .list(5)
 
@@ -247,7 +244,7 @@ final class TournamentRepo(val coll: Coll, playerCollName: CollName)(implicit
           case Daily                      => 1 * 60
           case _                          => 30
         }
-        if (tour.variant.exotic) base / 3 else base
+        if (tour.variant.exotic && schedule.freq != Unique) base / 3 else base
       }
     }
 

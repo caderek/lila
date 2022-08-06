@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="preferences">Preferências</string>
-  <string name="gameDisplay">Exibição do jogo</string>
+  <string name="display">Mostrar</string>
+  <string name="privacy">Privacidade</string>
   <string name="pieceAnimation">Animação das peças</string>
   <string name="materialDifference">Diferença material</string>
   <string name="boardHighlights">Destacar casas do tabuleiro (último movimento e xeque)</string>
@@ -35,7 +36,7 @@
   <string name="explainPromoteToQueenAutomatically">Mantenha a tecla &lt;ctrl&gt; pressionada enquanto promove para desativar temporariamente a autopromoção</string>
   <string name="whenPremoving">Quando mover antecipadamente</string>
   <string name="claimDrawOnThreefoldRepetitionAutomatically">Reivindicar empate automaticamente após uma repetição tripla</string>
-  <string name="whenTimeRemainingLessThanThirtySeconds">Quando o tempo restante for menor que 30 segundos</string>
+  <string name="whenTimeRemainingLessThanThirtySeconds" comment="whenTimeRemainingLessThanThirtySeconds&#10;&amp;lt; becomes &lt;.&#10;The &amp;lt; symbol is not required (you can write it as 'less than' in words), just do NOT use &lt; in its place.">Quando o tempo restante for menor que 30 segundos</string>
   <string name="moveConfirmation">Confirmação de movimento</string>
   <string name="inCorrespondenceGames">Jogos por correspondência</string>
   <string name="correspondenceAndUnlimited">Por correspondência e sem limites</string>

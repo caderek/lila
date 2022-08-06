@@ -35,7 +35,7 @@ export default function renderMsgs(ctrl: MsgCtrl, convo: Convo): VNode {
             )
           : null,
         ...contentMsgs(ctrl, convo.msgs),
-        ctrl.typing ? h('div.msg-app__convo__msgs__typing', `${convo.user.name} is typing...`) : null,
+        h('div.msg-app__convo__msgs__typing', ctrl.typing ? `${convo.user.name} is typing...` : null),
       ]),
     ]
   );
@@ -124,7 +124,7 @@ const renderText = (msg: Msg) =>
 const setupMsgs = (insert: boolean) => (vnode: VNode) => {
   const el = vnode.elm as HTMLElement;
   if (insert) scroller.init(el);
-  enhance.expandIFrames(el);
+  enhance.expandLpvs(el);
   scroller.toMarker() || scroller.auto();
 };
 

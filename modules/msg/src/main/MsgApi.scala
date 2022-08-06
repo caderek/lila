@@ -156,7 +156,7 @@ final class MsgApi(
     systemPost(destId, preset.text)
 
   def systemPost(destId: User.ID, text: String) =
-    post(User.lichessId, destId, text, multi = true)
+    post(User.lichessId, destId, text, multi = true, ignoreSecurity = true)
 
   def multiPost(orig: Holder, destSource: Source[User.ID, _], text: String): Fu[Int] =
     destSource
@@ -270,31 +270,28 @@ final class MsgApi(
           Match($doc("users" -> userId)),
           Project($id(true)),
           PipelineOperator(
-            $doc(
-              "$lookup" -> $doc(
-                "from" -> colls.msg.name,
-                "let"  -> $doc("t" -> "$_id"),
-                "pipeline" -> $arr(
-                  $doc(
-                    "$match" -> $doc(
-                      "$expr" -> $doc(
-                        "$and" -> $arr(
-                          $doc("$eq" -> $arr("$user", userId)),
-                          $doc("$eq" -> $arr("$tid", "$$t")),
-                          $doc(
-                            "$not" -> $doc(
-                              "$regexMatch" -> $doc(
-                                "input" -> "$text",
-                                "regex" -> "You received this because you are (subscribed to messages|part) of the team"
-                              )
+            $lookup.pipelineFull(
+              from = colls.msg.name,
+              as = "msg",
+              let = $doc("t" -> "$_id"),
+              pipe = List(
+                $doc(
+                  "$match" ->
+                    $expr(
+                      $and(
+                        $doc("$eq" -> $arr("$user", userId)),
+                        $doc("$eq" -> $arr("$tid", "$$t")),
+                        $doc(
+                          "$not" -> $doc(
+                            "$regexMatch" -> $doc(
+                              "input" -> "$text",
+                              "regex" -> "You received this because you are (subscribed to messages|part) of the team"
                             )
                           )
                         )
                       )
                     )
-                  )
-                ),
-                "as" -> "msg"
+                )
               )
             )
           ),

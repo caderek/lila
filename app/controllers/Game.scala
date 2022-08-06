@@ -37,7 +37,7 @@ final class Game(
       }
     }
 
-  def exportOne(id: String) = Action.async { exportGame(id, _) }
+  def exportOne(id: String) = Action.async { exportGame(GameModel takeGameId id, _) }
 
   private[controllers] def exportGame(gameId: GameModel.ID, req: RequestHeader): Fu[Result] =
     env.round.proxyRepo.gameIfPresent(gameId) orElse env.game.gameRepo.game(gameId) flatMap {
@@ -70,8 +70,8 @@ final class Game(
     AnonOrScoped() { req => me => handleExport(username, me, req, oauth = me.isDefined) }
 
   private def handleExport(username: String, me: Option[lila.user.User], req: RequestHeader, oauth: Boolean) =
-    env.user.repo enabledNamed username flatMap {
-      _ ?? { user =>
+    env.user.repo named username flatMap {
+      _.filter(u => u.enabled || me.exists(_ is u) || me.??(isGranted(_.GamesModView, _))) ?? { user =>
         val format = GameApiV2.Format byRequest req
         WithVs(req) { vs =>
           val finished = getBoolOpt("finished", req) | true
@@ -103,22 +103,48 @@ final class Game(
               .pipe(noProxyBuffer)
               .as(gameContentType(config))
               .fuccess
-          else {
-            val date = DateTimeFormat forPattern "yyyy-MM-dd" print DateTime.now
+          else
             apiC
               .GlobalConcurrencyLimitPerIpAndUserOption(req, me)(env.api.gameApiV2.exportByUser(config)) {
                 source =>
                   Ok.chunked(source)
                     .pipe(
-                      asAttachmentStream(s"lichess_${user.username}_$date.${format.toString.toLowerCase}")
+                      asAttachmentStream(
+                        s"lichess_${user.username}_${fileDate}.${format.toString.toLowerCase}"
+                      )
                     )
                     .as(gameContentType(config))
               }
               .fuccess
-          }
+
         }
       }
     }
+
+  private def fileDate = DateTimeFormat forPattern "yyyy-MM-dd" print DateTime.now
+
+  def apiExportByUserImportedGames(username: String) =
+    OpenOrScoped(_.Study.Read)(
+      open = ctx => handleExportByUserImportedGames(username, ctx.me, ctx.req),
+      scoped = req => me => handleExportByUserImportedGames(username, me.some, req)
+    )
+
+  private def handleExportByUserImportedGames(
+      username: String,
+      me: Option[lila.user.User],
+      req: RequestHeader
+  ) = env.user.repo named username map {
+    _.filter(u => u.enabled || me.exists(_ is u)) ?? { user =>
+      apiC
+        .GlobalConcurrencyLimitPerIpAndUserOption(req, me)(
+          env.api.gameApiV2.exportUserImportedGames(user)
+        ) { source =>
+          Ok.chunked(source)
+            .pipe(asAttachmentStream(s"lichess_${user.username}_$fileDate.imported.pgn"))
+            .as(pgnContentType)
+        }
+    }
+  }
 
   def exportByIds =
     Action.async(parse.tolerantText) { req =>

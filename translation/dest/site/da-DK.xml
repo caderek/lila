@@ -348,6 +348,8 @@
   <string name="apply">Anvend</string>
   <string name="save">Gem</string>
   <string name="leaderboard">Førertavle</string>
+  <string name="screenshotCurrentPosition">Tag et skræmbillede af den aktuelle stilling</string>
+  <string name="gameAsGIF">Parti som GIF</string>
   <string name="pasteTheFenStringHere">Indsæt FEN-teksten her</string>
   <string name="pasteThePgnStringHere">Indsæt PGN-teksten her</string>
   <string name="orUploadPgnFile">Eller upload en PGN-fil</string>
@@ -426,6 +428,8 @@
   <string name="tournamentIsStarting">Turneringen er begyndt</string>
   <string name="tournamentPairingsAreNowClosed">Pardannelsen til turneringen er nu lukket.</string>
   <string name="standByX">Et øjeblik %s, parrer spillere – gør dig klar!</string>
+  <string name="pause">Sæt på pause</string>
+  <string name="resume">Genoptag</string>
   <string name="youArePlaying">Du spiller nu!</string>
   <string name="winRate">Sejrsrate</string>
   <string name="berserkRate">Bersærk-rate</string>
@@ -460,6 +464,10 @@
   <string name="socialMediaLinks">Links til sociale medier</string>
   <string name="oneUrlPerLine">En URL pr. linje.</string>
   <string name="inlineNotation">Notation uden linjeskift</string>
+  <string name="savingMoves">Midlertidig træk-lagerplads</string>
+  <string name="savingMovesHelp">Vi gemmer altid dine variationer i din browser-cache.</string>
+  <string name="makeAStudy">Overvej at lave et studie for sikker opbevaring og deling.</string>
+  <string name="clearSavedMoves">Ryd træk</string>
   <string name="previouslyOnLichessTV">Tidligere på Lichess TV</string>
   <string name="onlinePlayers">Online spillere</string>
   <string name="activePlayers">Aktive spillere</string>
@@ -563,6 +571,7 @@
   <string name="community">Fællesskab</string>
   <string name="tools">Værktøjer</string>
   <string name="increment">Forøgelse</string>
+  <string name="error.unknown">Ugyldig værdi</string>
   <string name="error.required">Dette felt skal udfyldes</string>
   <string name="error.email">Denne e-mailadresse er ugyldig</string>
   <string name="error.email_acceptable">Denne e-mailadresse kan ikke accepteres. Dobbelttjek den, og prøv igen.</string>

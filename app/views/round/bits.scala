@@ -20,6 +20,7 @@ object bits {
       moreCss: Frag = emptyFrag,
       chessground: Boolean = true,
       playing: Boolean = false,
+      zenable: Boolean = false,
       robots: Boolean = false
   )(body: Frag)(implicit ctx: Context) =
     views.html.base.layout(
@@ -27,13 +28,14 @@ object bits {
       openGraph = openGraph,
       moreJs = moreJs,
       moreCss = frag(
-        cssTag { if (variant == Crazyhouse) "round.zh" else "round" },
+        cssTag(if (variant == Crazyhouse) "round.zh" else "round"),
         ctx.pref.hasKeyboardMove option cssTag("keyboardMove"),
         ctx.blind option cssTag("round.nvui"),
         moreCss
       ),
       chessground = chessground,
       playing = playing,
+      zenable = zenable,
       robots = robots,
       zoomable = true,
       csp = defaultCsp.withPeer.some

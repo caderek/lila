@@ -24,7 +24,7 @@ final private class MsgSecurity(
     chatPanic: lila.chat.ChatPanic
 )(implicit
     ec: scala.concurrent.ExecutionContext,
-    system: akka.actor.ActorSystem
+    scheduler: akka.actor.Scheduler
 ) {
 
   import BsonHandlers._
@@ -136,7 +136,7 @@ final private class MsgSecurity(
 
     def post(contacts: User.Contacts, isNew: Boolean): Fu[Boolean] =
       fuccess(contacts.dest.id != User.lichessId) >>& {
-        fuccess(Granter.byRoles(_.ModMessage)(~contacts.orig.roles)) >>| {
+        fuccess(Granter.byRoles(_.PublicMod)(~contacts.orig.roles)) >>| {
           !relationApi.fetchBlocks(contacts.dest.id, contacts.orig.id) >>&
             (create(contacts) >>| reply(contacts)) >>&
             chatPanic.allowed(contacts.orig.id, userRepo.byId) >>&

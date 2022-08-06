@@ -21,16 +21,17 @@ case class Puzzle(
       fm * 2 - color.fold(1, 2)
     }
 
-  lazy val fenAfterInitialMove: FEN = {
-    for {
-      sit1 <- Forsyth << fen
-      sit2 <- sit1.move(line.head).toOption.map(_.situationAfter)
-    } yield Forsyth >> sit2
-  } err s"Can't apply puzzle $id first move"
+  def situationAfterInitialMove: Option[chess.Situation] = for {
+    sit1 <- Forsyth << fen
+    sit2 <- sit1.move(line.head).toOption.map(_.situationAfter)
+  } yield sit2
+
+  lazy val fenAfterInitialMove: FEN =
+    situationAfterInitialMove map Forsyth.>> err s"Can't apply puzzle $id first move"
 
   def color = fen.color.fold[chess.Color](chess.White)(!_)
 
-  def hasTheme(theme: PuzzleTheme) = themes(theme.key)
+  def hasTheme(anyOf: PuzzleTheme*) = anyOf.exists(t => themes(t.key))
 }
 
 object Puzzle {
@@ -82,7 +83,7 @@ object Puzzle {
   case class UserResult(
       puzzleId: Id,
       userId: lila.user.User.ID,
-      result: Result,
+      result: PuzzleResult,
       rating: (Int, Int)
   )
 
@@ -97,6 +98,7 @@ object Puzzle {
     val voteDown = "vd"
     val plays    = "plays"
     val themes   = "themes"
+    val opening  = "opening"
     val day      = "day"
     val issue    = "issue"
     val dirty    = "dirty" // themes need to be denormalized

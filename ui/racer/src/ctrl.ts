@@ -1,6 +1,6 @@
 import config from './config';
 import CurrentPuzzle from 'puz/current';
-import throttle from 'common/throttle';
+import throttle, { throttlePromiseDelay } from 'common/throttle';
 import * as xhr from 'common/xhr';
 import { Api as CgApi } from 'chessground/api';
 import { Boost } from './boost';
@@ -14,12 +14,11 @@ import { Run } from 'puz/interfaces';
 import { defined, prop, Prop } from 'common';
 import { RacerOpts, RacerData, RacerVm, RacerPrefs, Race, UpdatableData, RaceStatus, WithGround } from './interfaces';
 import { Role } from 'chessground/types';
-import { storedProp } from 'common/storage';
+import { storedBooleanProp } from 'common/storage';
 import { PromotionCtrl } from 'chess/promotion';
 
 export default class RacerCtrl {
   private data: RacerData;
-  private redraw: () => void;
   private sign = Math.random().toString(36);
   private localScore = 0;
   race: Race;
@@ -31,15 +30,14 @@ export default class RacerCtrl {
   countdown: Countdown;
   boost: Boost = new Boost();
   skipAvailable = true;
-  knowsSkip = storedProp('racer.skip', false);
+  knowsSkip = storedBooleanProp('racer.skip', false);
   ground = prop<CgApi | false>(false) as Prop<CgApi | false>;
   flipped = false;
 
-  constructor(opts: RacerOpts, redraw: (data: RacerData) => void) {
+  constructor(opts: RacerOpts, readonly redraw: () => void) {
     this.data = opts.data;
     this.race = this.data.race;
     this.pref = opts.pref;
-    this.redraw = () => redraw(this.data);
     this.trans = lichess.trans(opts.i18n);
     this.run = {
       pov: puzzlePov(this.data.puzzles[0]),
@@ -133,6 +131,7 @@ export default class RacerCtrl {
       : undefined;
 
   end = (): void => {
+    this.pushToHistory(false); // add last unsolved puzzle
     this.setGround();
     this.redraw();
     sound.end();
@@ -220,14 +219,21 @@ export default class RacerCtrl {
   private setGround = () => this.withGround(g => g.set(this.cgOpts()));
 
   private incPuzzle = (win: boolean): boolean => {
+    this.pushToHistory(win);
     const index = this.run.current.index;
-    this.run.history.push({ puzzle: this.data.puzzles[index], win, millis: getNow() - this.run.current.startAt });
     if (index < this.data.puzzles.length - 1) {
       this.run.current = new CurrentPuzzle(index + 1, this.data.puzzles[index + 1]);
       return true;
     }
     return false;
   };
+
+  private pushToHistory = (win: boolean) =>
+    this.run.history.push({
+      puzzle: this.data.puzzles[this.run.current.index],
+      win,
+      millis: getNow() - this.run.current.startAt,
+    });
 
   withGround: WithGround = f => {
     const g = this.ground();
@@ -252,11 +258,13 @@ export default class RacerCtrl {
 
   private socketSend = (tpe: string, data?: any) => lichess.socket.send(tpe, data, { sign: this.sign });
 
-  private setZen = throttle(1000, zen =>
-    xhr.text('/pref/zen', {
-      method: 'post',
-      body: xhr.form({ zen: zen ? 1 : 0 }),
-    })
+  private setZen = throttlePromiseDelay(
+    () => 1000,
+    zen =>
+      xhr.text('/pref/zen', {
+        method: 'post',
+        body: xhr.form({ zen: zen ? 1 : 0 }),
+      })
   );
 
   private toggleZen = () => lichess.pubsub.emit('zen');

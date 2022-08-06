@@ -1,53 +1,77 @@
 package lila.ublog
 
 import java.util.regex.Matcher
+import play.api.Mode
 import scala.concurrent.duration._
 
-import lila.common.Chronometer
 import lila.common.config
-import lila.common.config.NetConfig
+import lila.common.{ Bus, Chronometer, Markdown, MarkdownRender }
+import lila.game.Game
+import lila.hub.actorApi.lpv.GamePgnsFromText
+import lila.memo.CacheApi
 
-final class UblogMarkup(baseUrl: config.BaseUrl, assetBaseUrl: config.AssetBaseUrl) {
+final class UblogMarkup(
+    baseUrl: config.BaseUrl,
+    assetBaseUrl: config.AssetBaseUrl,
+    cacheApi: CacheApi,
+    netDomain: config.NetDomain
+)(implicit ec: scala.concurrent.ExecutionContext, scheduler: akka.actor.Scheduler, mode: Mode) {
 
-  private val renderer =
-    new lila.common.Markdown(
-      autoLink = true,
-      list = true,
-      strikeThrough = true,
-      header = true,
-      blockQuote = true,
-      code = true,
-      table = true
-    )
+  import UblogMarkup._
 
-  type Text = String
-  type Html = String
+  private val pgnCache = cacheApi.notLoadingSync[Game.ID, String](256, "ublogMarkup.pgn") {
+    _.expireAfterWrite(1 second).build()
+  }
 
-  def apply(post: UblogPost): String = cache.get(post.markdown, process(post))
+  private val renderer = new MarkdownRender(
+    autoLink = true,
+    list = true,
+    strikeThrough = true,
+    header = true,
+    blockQuote = true,
+    code = true,
+    table = true,
+    gameExpand = MarkdownRender.GameExpand(netDomain, pgnCache.getIfPresent).some
+  )
 
-  private val cache = lila.memo.CacheApi.scaffeineNoScheduler.maximumSize(2048).build[Text, Html]()
+  def apply(post: UblogPost) = cache.get((post.id, post.markdown)).map(scalatags.Text.all.raw)
 
-  private def process(post: UblogPost): Text => Html = replaceGameGifs.apply andThen
+  private val cache = cacheApi[(UblogPost.Id, Markdown), Html](2048, "ublog.markup") {
+    _.maximumSize(2048)
+      .expireAfterWrite(if (mode == Mode.Prod) 15 minutes else 1 second)
+      .buildAsyncFuture { case (id, markdown) =>
+        Bus.ask("lpv")(GamePgnsFromText(markdown.value, _)) andThen { case scala.util.Success(pgns) =>
+          pgnCache.putAll(pgns)
+        } inject process(id)(markdown)
+      }
+  }
+
+  private def process(id: UblogPost.Id): Markdown => Html = replaceGameGifs.apply andThen
     unescapeAtUsername.apply andThen
-    renderer(s"ublog:${post.id}") andThen
+    renderer(s"ublog:${id}") andThen
     imageParagraph andThen
     unescapeUnderscoreInLinks.apply
 
   // replace game GIFs URLs with actual game URLs that can be embedded
   private object replaceGameGifs {
     private val regex = (assetBaseUrl.value + """/game/export/gif(/white|/black|)/(\w{8})\.gif""").r
-    val apply         = (markdown: Text) => regex.replaceAllIn(markdown, baseUrl.value + "/$2$1")
+    val apply         = (markdown: Markdown) => markdown(m => regex.replaceAllIn(m, baseUrl.value + "/$2$1"))
   }
 
   // put images into a container for styling
   private def imageParagraph(markup: Html) =
     markup.replace("""<p><img src=""", """<p class="img-container"><img src=""")
+}
+
+private[ublog] object UblogMarkup {
+
+  private type Html = String
 
   private def unescape(txt: String) = txt.replace("""\_""", "_")
 
   // https://github.com/lichess-org/lila/issues/9767
   // toastui editor escapes `_` as `\_` and it breaks autolinks
-  private[ublog] object unescapeUnderscoreInLinks {
+  object unescapeUnderscoreInLinks {
     private val hrefRegex    = """href="([^"]+)"""".r
     private val contentRegex = """>([^<]+)</a>""".r
     def apply(markup: Html) = contentRegex.replaceAllIn(
@@ -57,10 +81,11 @@ final class UblogMarkup(baseUrl: config.BaseUrl, assetBaseUrl: config.AssetBaseU
   }
 
   // toastui editor escapes `_` as `\_` and it breaks @username
-  private[ublog] object unescapeAtUsername {
+  object unescapeAtUsername {
     // Same as `atUsernameRegex` in `RawHtmlTest.scala` but it also matchs the '\' character.
     // Can't end with '\', which would be escaping something after the username, like '\)'
     private val atUsernameRegexEscaped = """@(?<![\w@#/]@)([\w\\-]{1,29}\w)(?![@\w-]|\.\w)""".r
-    def apply(markdown: Text) = atUsernameRegexEscaped.replaceAllIn(markdown, m => s"@${unescape(m group 1)}")
+    def apply(markdown: Markdown) =
+      markdown(m => atUsernameRegexEscaped.replaceAllIn(m, a => s"@${unescape(a group 1)}"))
   }
 }

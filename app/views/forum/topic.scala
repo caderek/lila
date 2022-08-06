@@ -71,7 +71,7 @@ object topic {
   def show(
       categ: lila.forum.Categ,
       topic: lila.forum.Topic,
-      posts: Paginator[lila.forum.Post],
+      posts: Paginator[lila.forum.Post.WithFrag],
       formWithCaptcha: Option[FormWithCaptcha],
       unsub: Option[Boolean],
       canModCateg: Boolean
@@ -88,31 +88,33 @@ object topic {
         .OpenGraph(
           title = topic.name,
           url = s"$netBaseUrl${routes.ForumTopic.show(categ.slug, topic.slug, posts.currentPage).url}",
-          description = shorten(posts.currentPageResults.headOption.??(_.text), 152)
+          description = shorten(posts.currentPageResults.headOption.??(_.post.text), 152)
         )
-        .some
+        .some,
+      csp = defaultCsp.withInlineIconFont.some
     ) {
       val teamOnly = categ.team.filterNot(isMyTeamSync)
       val pager = views.html.base.bits
         .paginationByQuery(routes.ForumTopic.show(categ.slug, topic.slug, 1), posts, showPost = true)
-
       main(cls := "forum forum-topic page-small box box-pad")(
         h1(
           a(
-            href     := routes.ForumCateg.show(categ.slug),
+            href := topic.ublogId.fold(s"${routes.ForumCateg.show(categ.slug)}") { id =>
+              routes.Ublog.redirect(id).url
+            },
             dataIcon := "",
             cls      := "text"
           ),
           topic.name
         ),
         pager,
-        div(cls := "forum-topic__posts expand-text")(
+        div(cls := "forum-topic__posts")(
           posts.currentPageResults.map { p =>
             post.show(
               categ,
               topic,
               p,
-              s"${routes.ForumTopic.show(categ.slug, topic.slug, posts.currentPage)}#${p.number}",
+              s"${routes.ForumTopic.show(categ.slug, topic.slug, posts.currentPage)}#${p.post.number}",
               canReply = formWithCaptcha.isDefined,
               canModCateg = canModCateg,
               canReact = teamOnly.isEmpty
@@ -157,19 +159,19 @@ object topic {
                   if (topic.hidden) "Feature" else "Un-feature"
                 )
               ),
-            canModCateg option frag(
+            canModCateg || (topic.isUblog && ctx.me.exists(topic.isAuthor)) option
               postForm(action := routes.ForumTopic.close(categ.slug, topic.slug))(
                 button(cls := "button button-empty button-red")(
                   if (topic.closed) "Reopen" else "Close"
                 )
               ),
+            canModCateg option
               postForm(action := routes.ForumTopic.sticky(categ.slug, topic.slug))(
                 button(cls := "button button-empty button-brag")(
                   if (topic.isSticky) "Unsticky" else "Sticky"
                 )
               ),
-              deleteModal
-            )
+            canModCateg || ctx.me.exists(topic.isAuthor) option deleteModal
           )
         ),
         formWithCaptcha.map { case (form, captcha) =>

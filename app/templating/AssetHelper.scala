@@ -28,10 +28,10 @@ trait AssetHelper { self: I18nHelper with SecurityHelper =>
   def cdnUrl(path: String) = s"$assetBaseUrl$path"
 
   def cssTag(name: String)(implicit ctx: Context): Frag =
-    cssTagWithTheme(name, ctx.currentBg)
+    cssTagWithDirAndTheme(name, isRTL, ctx.currentBg)
 
-  def cssTagWithTheme(name: String, theme: String): Frag =
-    cssAt(s"css/$name.$theme.${if (minifiedAssets) "min" else "dev"}.css")
+  def cssTagWithDirAndTheme(name: String, isRTL: Boolean, theme: String): Frag =
+    cssAt(s"css/$name.${if (isRTL) "rtl" else "ltr"}.$theme.${if (minifiedAssets) "min" else "dev"}.css")
 
   def cssTagNoTheme(name: String): Frag =
     cssAt(s"css/$name.${if (minifiedAssets) "min" else "dev"}.css")
@@ -53,6 +53,7 @@ trait AssetHelper { self: I18nHelper with SecurityHelper =>
   def roundNvuiTag(implicit ctx: Context) = ctx.blind option jsModule("round.nvui")
 
   def analyseTag                            = jsModule("analysisBoard")
+  def analyseStudyTag                       = jsModule("analysisBoard.study")
   def analyseNvuiTag(implicit ctx: Context) = ctx.blind option jsModule("analysisBoard.nvui")
 
   def puzzleTag                            = jsModule("puzzle")
@@ -90,6 +91,7 @@ trait AssetHelper { self: I18nHelper with SecurityHelper =>
       workerSrc = List("'self'", assets),
       imgSrc = List("data:", "*"),
       scriptSrc = List("'self'", assets),
+      fontSrc = List("'self'", assets),
       baseUri = List("'none'")
     )
   }

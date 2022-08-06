@@ -1,8 +1,8 @@
 package lila.relay
 
 import akka.stream.scaladsl.Source
-import org.joda.time.DateTime
 import alleycats.Zero
+import org.joda.time.DateTime
 import play.api.libs.json._
 import reactivemongo.akkastream.cursorProducer
 import reactivemongo.api.bson._
@@ -12,6 +12,7 @@ import scala.util.chaining._
 
 import lila.common.config.MaxPerSecond
 import lila.db.dsl._
+import lila.memo.CacheApi
 import lila.study.{ Settings, Study, StudyApi, StudyMaker, StudyMultiBoard, StudyRepo }
 import lila.user.User
 
@@ -22,7 +23,9 @@ final class RelayApi(
     studyRepo: StudyRepo,
     multiboard: StudyMultiBoard,
     jsonView: JsonView,
-    formatApi: RelayFormatApi
+    formatApi: RelayFormatApi,
+    cacheApi: CacheApi,
+    leaderboard: RelayLeaderboardApi
 )(implicit ec: scala.concurrent.ExecutionContext, mat: akka.stream.Materializer) {
 
   import BSONHandlers._
@@ -80,65 +83,59 @@ final class RelayApi(
       .sort($doc("startedAt" -> -1, "startsAt" -> -1))
       .one[RelayRound]
 
-  def officialActive: Fu[List[RelayTour.ActiveWithNextRound]] =
-    tourRepo.coll
-      .aggregateList(20) { framework =>
-        import framework._
-        Match(tourRepo.selectors.officialActive) -> List(
-          Sort(Descending("tier")),
-          PipelineOperator(
-            $doc(
-              "$lookup" -> $doc(
-                "from" -> roundRepo.coll.name,
-                "as"   -> "round",
-                "let"  -> $doc("id" -> "$_id"),
-                "pipeline" -> $arr(
-                  $doc(
-                    "$match" -> $doc(
-                      "$expr" -> $doc(
-                        "$and" -> $arr(
-                          $doc("$eq" -> $arr("$tourId", "$$id")),
-                          $doc("$eq" -> $arr("$finished", false))
-                        )
-                      )
-                    )
-                  ),
-                  $doc("$addFields" -> $doc("sync.log" -> $arr())),
-                  $doc("$sort"      -> roundRepo.sort.chrono),
-                  $doc("$limit"     -> 1)
+  val officialActive = cacheApi.unit[List[RelayTour.ActiveWithNextRound]] {
+    _.refreshAfterWrite(5 seconds)
+      .buildAsyncFuture { _ =>
+        tourRepo.coll
+          .aggregateList(30) { framework =>
+            import framework._
+            Match(tourRepo.selectors.officialActive) -> List(
+              Sort(Descending("tier")),
+              PipelineOperator(
+                $lookup.pipeline(
+                  from = roundRepo.coll,
+                  as = "round",
+                  local = "_id",
+                  foreign = "tourId",
+                  pipe = List(
+                    $doc("$match"     -> $doc("finished" -> false)),
+                    $doc("$addFields" -> $doc("sync.log" -> $arr())),
+                    $doc("$sort"      -> roundRepo.sort.chrono),
+                    $doc("$limit"     -> 1)
+                  )
                 )
-              )
+              ),
+              UnwindField("round"),
+              Limit(30)
             )
-          ),
-          UnwindField("round")
-        )
+          }
+          .map { docs =>
+            for {
+              doc   <- docs
+              tour  <- doc.asOpt[RelayTour]
+              round <- doc.getAsOpt[RelayRound]("round")
+            } yield RelayTour.ActiveWithNextRound(tour, round)
+          }
       }
-      .map { docs =>
-        for {
-          doc   <- docs
-          tour  <- doc.asOpt[RelayTour]
-          round <- doc.getAsOpt[RelayRound]("round")
-        } yield RelayTour.ActiveWithNextRound(tour, round)
-      }
+  }
 
   def tourById(id: RelayTour.Id) = tourRepo.coll.byId[RelayTour](id.value)
 
-  private[relay] def toSync: Fu[List[RelayRound.WithTour]] =
-    fetchWithTours(
-      $doc(
-        "sync.until" $exists true,
-        "sync.nextAt" $lt DateTime.now
-      ),
-      20
-    )
-
-  def fetchWithTours(query: Bdoc, maxDocs: Int, readPreference: ReadPreference = ReadPreference.primary) =
+  private[relay] def toSync(official: Boolean, maxDocs: Int = 30) =
     roundRepo.coll
-      .aggregateList(maxDocs, readPreference) { framework =>
+      .aggregateList(maxDocs, ReadPreference.primary) { framework =>
         import framework._
-        Match(query) -> List(
+        Match(
+          $doc(
+            "sync.until" $exists true,
+            "sync.nextAt" $lt DateTime.now,
+            "tour.tier" $exists official
+          )
+        ) -> List(
           PipelineOperator(tourRepo lookup "tourId"),
-          UnwindField("tour")
+          UnwindField("tour"),
+          Sort(Descending("tour.tier")),
+          Limit(maxDocs)
         )
       }
       .map(_ flatMap readRoundWithTour)
@@ -149,7 +146,8 @@ final class RelayApi(
   }
 
   def tourUpdate(tour: RelayTour, data: RelayTourForm.Data, user: User): Funit =
-    tourRepo.coll.update.one($id(tour.id), data.update(tour, user)).void
+    tourRepo.coll.update.one($id(tour.id), data.update(tour, user)).void >>-
+      leaderboard.invalidate(tour.id)
 
   def create(data: RelayRoundForm.Data, user: User, tour: RelayTour): Fu[RelayRound] =
     roundRepo.lastByTour(tour) flatMap {
@@ -223,8 +221,10 @@ final class RelayApi(
         old.hasStartedEarly ?? roundRepo.coll.update
           .one($id(relay.id), $set("finished" -> false) ++ $unset("startedAt"))
           .void
-      } >>-
-        multiboard.invalidate(relay.studyId)
+      } >>- {
+        multiboard invalidate relay.studyId
+        leaderboard invalidate relay.tourId
+      }
     } >> requestPlay(old.id, v = true)
 
   def deleteRound(roundId: RelayRound.Id): Fu[Option[RelayTour]] =

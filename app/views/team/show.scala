@@ -33,7 +33,7 @@ object show {
         .OpenGraph(
           title = s"${t.name} team",
           url = s"$netBaseUrl${routes.Team.show(t.id).url}",
-          description = shorten(t.description, 152)
+          description = shorten(t.description.value, 152)
         )
         .some,
       moreJs = frag(
@@ -57,6 +57,7 @@ object show {
     ) {
       val manageTeamEnabled = isGranted(_.ManageTeam) && requestedModView
       val enabledOrLeader   = t.enabled || info.ledByMe || manageTeamEnabled
+      val canSeeMembers     = t.enabled && (t.publicMembers || info.mine || manageTeamEnabled)
       main(
         cls := "team-show box",
         socketVersion.map { v =>
@@ -67,7 +68,10 @@ object show {
           h1(cls := "text", dataIcon := "")(t.name),
           div(
             if (t.disabled) span(cls := "staff")("CLOSED")
-            else nbMembers.plural(t.nbMembers, strong(t.nbMembers.localize))
+            else
+              canSeeMembers option a(href := routes.Team.members(t.slug))(
+                nbMembers.plural(t.nbMembers, strong(t.nbMembers.localize))
+              )
           )
         ),
         div(cls := "team-show__content")(
@@ -174,11 +178,11 @@ object show {
                 "View team as Mod"
               )
             ),
-            t.enabled && (t.publicMembers || info.mine || manageTeamEnabled) option div(
+            canSeeMembers option div(
               cls := "team-show__members"
             )(
               st.section(cls := "recent-members")(
-                h2(teamRecentMembers()),
+                h2(a(href := routes.Team.members(t.slug))(teamRecentMembers())),
                 div(cls := "userlist infinite-scroll")(
                   members.currentPageResults.map { member =>
                     div(cls := "paginated")(lightUserLink(member))
@@ -191,8 +195,8 @@ object show {
           div(cls := "team-show__content__col2")(
             standardFlash(),
             log.nonEmpty option renderLog(log),
-            st.section(cls := "team-show__desc")(
-              markdown(t, t.descPrivate.ifTrue(info.mine) | t.description)
+            (t.enabled || manageTeamEnabled) option st.section(cls := "team-show__desc")(
+              bits.markdown(t, t.descPrivate.ifTrue(info.mine) | t.description)
             ),
             t.enabled && info.hasRequests option div(cls := "team-show__requests")(
               h2(xJoinRequests.pluralSame(info.requests.size)),
@@ -239,16 +243,6 @@ object show {
         )
       )
     }
-
-  private object markdown {
-    import scala.concurrent.duration._
-    private val renderer = new lila.common.Markdown(header = true, list = true, table = true)
-    private val cache = lila.memo.CacheApi.scaffeineNoScheduler
-      .expireAfterAccess(10 minutes)
-      .maximumSize(1024)
-      .build[String, String]()
-    def apply(team: Team, text: String): Frag = raw(cache.get(text, renderer(s"team:${team.id}")))
-  }
 
   // handle special teams here
   private def joinButton(t: Team)(implicit ctx: Context) =

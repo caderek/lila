@@ -24,23 +24,19 @@ final class AccountClosure(
     webSubscriptionApi: lila.push.WebSubscriptionApi,
     streamerApi: lila.streamer.StreamerApi,
     reportApi: lila.report.ReportApi,
+    modApi: lila.mod.ModApi,
     modLogApi: lila.mod.ModlogApi,
     appealApi: lila.appeal.AppealApi,
     activityWrite: lila.activity.ActivityWriteApi,
     email: lila.mailer.AutomaticEmail
 )(implicit ec: ExecutionContext, scheduler: Scheduler) {
 
-  Bus.subscribeFun("garbageCollect") { case lila.hub.actorApi.security.GarbageCollect(userId) =>
-    // GC can be aborted by reverting the initial SB mark
-    userRepo.isTroll(userId) foreach { troll =>
-      if (troll) scheduler.scheduleOnce(1.second) {
-        lichessClose(userId).unit
-      }
-    }
-  }
-  Bus.subscribeFun("rageSitClose") { case lila.hub.actorApi.playban.RageSitClose(userId) =>
-    lichessClose(userId).unit
-  }
+  Bus.subscribeFuns(
+    "garbageCollect" -> { case lila.hub.actorApi.security.GarbageCollect(userId) =>
+      (modApi.garbageCollect(userId) >> lichessClose(userId)).unit
+    },
+    "rageSitClose" -> { case lila.hub.actorApi.playban.RageSitClose(userId) => lichessClose(userId).unit }
+  )
 
   def close(u: User, by: Holder): Funit =
     for {
@@ -51,7 +47,7 @@ final class AccountClosure(
       _       <- userRepo.disable(u, keepEmail = badApple || playbanned)
       _       <- relationApi.unfollowAll(u.id)
       _       <- rankingApi.remove(u.id)
-      teamIds <- teamApi.quitAll(u.id)
+      teamIds <- teamApi.quitAllOnAccountClosure(u.id)
       _       <- challengeApi.removeByUserId(u.id)
       _       <- tournamentApi.withdrawAll(u)
       _       <- swissApi.withdrawAll(u, teamIds)

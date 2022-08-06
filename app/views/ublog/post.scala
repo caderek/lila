@@ -44,7 +44,7 @@ object post {
         st.title := trans.ublog.xBlog.txt(user.username)
       ).some,
       robots = netConfig.crawlable && blog.listed && (post.indexable || blog.tier >= UblogBlog.Tier.HIGH),
-      csp = defaultCsp.withTwitter.some
+      csp = defaultCsp.withTwitter.withInlineIconFont.some
     ) {
       main(cls := "page-menu page-small")(
         views.html.blog.bits.menu(none, (if (ctx is user) "mine" else "community").some),
@@ -107,6 +107,14 @@ object post {
           strong(cls := "ublog-post__intro")(post.intro),
           div(cls := "ublog-post__markup expand-text")(markup),
           div(cls := "ublog-post__footer")(
+            if (post.live && ~post.discuss)
+              a(
+                href     := routes.Ublog.discuss(post.id.value),
+                cls      := "button text ublog-post__discuss",
+                dataIcon := ""
+              )(
+                "Discuss this blog post in the forum"
+              ),
             (ctx.isAuth && !ctx.is(user)) option
               div(cls := "ublog-post__actions")(
                 likeButton(post, liked, showText = true),

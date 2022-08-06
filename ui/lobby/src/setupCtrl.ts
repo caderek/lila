@@ -120,9 +120,17 @@ export default class SetupController {
   };
 
   private enforcePropRules = () => {
+    // reassign with this.propWithApply in this function to avoid calling this.onPropChange
+
+    // replace underscores with spaces in FEN
+    if (this.variant() === 'fromPosition') this.fen = this.propWithApply(this.fen().replace(/_/g, ' '));
+
     if (this.gameMode() === 'rated' && this.ratedModeDisabled()) {
-      // reassign with propWithEffect here to avoid calling this.onPropChange
-      this.gameMode = propWithEffect('casual', this.onPropChange);
+      this.gameMode = this.propWithApply('casual');
+    }
+
+    if (this.ratingMin() === 0 && this.ratingMax() === 0) {
+      this.ratingMax = this.propWithApply(50);
     }
   };
 
@@ -234,6 +242,12 @@ export default class SetupController {
       color,
     });
 
+  validFen = (): boolean => this.variant() !== 'fromPosition' || !this.fenError;
+  validTime = (): boolean => this.timeMode() !== 'realTime' || this.time() > 0 || this.increment() > 0;
+  validAiTime = (): boolean =>
+    this.gameType !== 'ai' || this.timeMode() !== 'realTime' || this.variant() !== 'fromPosition' || this.time() >= 1;
+  valid = (): boolean => this.validFen() && this.validTime() && this.validAiTime();
+
   submit = async (color: Color | 'random') => {
     const poolMember = this.hookToPoolMember(color);
     if (poolMember) {
@@ -263,8 +277,9 @@ export default class SetupController {
     }
 
     const { ok, redirected, url } = response;
+
     if (!ok) {
-      const errs: { [key: string]: [string] } = await response.json();
+      const errs: { [key: string]: string } = await response.json();
       alert(
         errs
           ? Object.keys(errs)
@@ -272,6 +287,11 @@ export default class SetupController {
               .join('\n')
           : 'Invalid setup'
       );
+      if (response.status == 403) {
+        // 403 FORBIDDEN closes this modal because challenges to the recipient
+        // will not be accepted.  see friend() in controllers/Setup.scala
+        this.closeModal();
+      }
     } else if (redirected) {
       location.href = url;
     } else {

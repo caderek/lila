@@ -42,14 +42,13 @@ final class Env(
 )(implicit
     ec: scala.concurrent.ExecutionContext,
     system: ActorSystem,
+    scheduler: akka.actor.Scheduler,
     mat: akka.stream.Materializer,
     idGenerator: lila.game.IdGenerator,
     mode: play.api.Mode
 ) {
 
   private val config = appConfig.get[TournamentConfig]("tournament")(AutoConfig.loader)
-
-  private def scheduler = system.scheduler
 
   lazy val forms = wire[TournamentForm]
 
@@ -95,6 +94,8 @@ final class Env(
 
   lazy val crudApi = wire[crud.CrudApi]
 
+  lazy val crudForm = wire[crud.CrudForm]
+
   lazy val reloadEndpointSetting = settingStore[String](
     "tournamentReloadEndpoint",
     default = "/tournament/{id}",
@@ -113,7 +114,7 @@ final class Env(
 
   private lazy val autoPairing = wire[AutoPairing]
 
-  lazy val getTourName = new GetTourName((id, lang) => cached.nameCache.sync(id -> lang))
+  lazy val getTourName = new GetTourName(cached.nameCache)
 
   wire[TournamentBusHandler]
 

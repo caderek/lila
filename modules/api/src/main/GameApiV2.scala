@@ -161,8 +161,7 @@ final class GameApiV2(
             batchSize = config.perSecond.value
           )
           .documentSource()
-          .grouped(config.perSecond.value)
-          .throttle(1, 1 second)
+          .grouped(20)
           .mapAsync(1) { pairings =>
             isTeamBattle.?? {
               playerRepo.teamsOfPlayers(config.tournamentId, pairings.flatMap(_.users).distinct).dmap(_.toMap)
@@ -185,6 +184,7 @@ final class GameApiV2(
             }
           }
           .mapConcat(identity)
+          .throttle(config.perSecond.value, 1 second)
           .mapAsync(4) { case (game, pairing, teams) =>
             enrich(config.flags)(game) dmap { (_, pairing, teams) }
           }
@@ -214,10 +214,10 @@ final class GameApiV2(
         swissId = config.swissId,
         batchSize = config.perSecond.value
       )
-      .grouped(config.perSecond.value)
-      .throttle(1, 1 second)
+      .grouped(20)
       .mapAsync(1)(gameRepo.gamesFromSecondary)
       .mapConcat(identity)
+      .throttle(config.perSecond.value, 1 second)
       .mapAsync(4)(enrich(config.flags))
       .mapAsync(4) { case (game, fen, analysis) =>
         config.format match {
@@ -228,6 +228,13 @@ final class GameApiV2(
             }
         }
       }
+
+  def exportUserImportedGames(user: User): Source[String, _] =
+    gameRepo
+      .sortedCursor(Query imported user.id, Query.importedSort, batchSize = 20)
+      .documentSource()
+      .throttle(20, 1 second)
+      .mapConcat(_.pgnImport.map(_.pgn).toList)
 
   private val upgradeOngoingGame =
     Flow[Game].mapAsync(4)(gameProxy.upgradeIfPresent)
@@ -304,7 +311,7 @@ final class GameApiV2(
             .add("name", p.name)
             .add("provisional" -> p.provisional)
             .add("aiLevel" -> p.aiLevel)
-            .add("analysis" -> analysisOption.flatMap(analysisJson.player(g pov p.color)))
+            .add("analysis" -> analysisOption.flatMap(analysisJson.player(g pov p.color sideAndStart)))
             .add("team" -> teams.map(_(p.color)))
         // .add("moveCentis" -> withFlags.moveTimes ?? g.moveTimes(p.color).map(_.map(_.centis)))
         })

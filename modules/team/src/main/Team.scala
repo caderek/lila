@@ -7,13 +7,14 @@ import scala.util.chaining._
 
 import lila.user.User
 import org.joda.time.Days
+import lila.common.Markdown
 
 case class Team(
     _id: Team.ID, // also the url slug
     name: String,
     password: Option[String],
-    description: String,
-    descPrivate: Option[String],
+    description: Markdown,
+    descPrivate: Option[Markdown],
     nbMembers: Int,
     enabled: Boolean,
     open: Boolean,
@@ -41,6 +42,8 @@ case class Team(
 
   def passwordMatches(pw: String) =
     password.forall(teamPw => MessageDigest.isEqual(teamPw.getBytes(UTF_8), pw.getBytes(UTF_8)))
+
+  def isOnlyLeader(userId: User.ID) = leaders == Set(userId)
 }
 
 object Team {
@@ -101,8 +104,8 @@ object Team {
       id: String,
       name: String,
       password: Option[String],
-      description: String,
-      descPrivate: Option[String],
+      description: Markdown,
+      descPrivate: Option[Markdown],
       open: Boolean,
       createdBy: User
   ): Team =

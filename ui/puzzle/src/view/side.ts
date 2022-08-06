@@ -9,8 +9,8 @@ export function puzzleBox(ctrl: Controller): VNode {
   return h('div.puzzle__side__metas', [puzzleInfos(ctrl, data.puzzle), gameInfos(ctrl, data.game, data.puzzle)]);
 }
 
-function puzzleInfos(ctrl: Controller, puzzle: Puzzle): VNode {
-  return h(
+const puzzleInfos = (ctrl: Controller, puzzle: Puzzle): VNode =>
+  h(
     'div.infos.puzzle',
     {
       attrs: dataIcon(''),
@@ -50,7 +50,6 @@ function puzzleInfos(ctrl: Controller, puzzle: Puzzle): VNode {
       ]),
     ]
   );
-}
 
 function gameInfos(ctrl: Controller, game: PuzzleGame, puzzle: Puzzle): VNode {
   const gameName = `${game.clock} • ${game.perf.name}`;
@@ -170,6 +169,11 @@ const difficulties: [PuzzleDifficulty, number][] = [
   ['harder', 300],
   ['hardest', 600],
 ];
+const colors = [
+  ['black', 'asBlack'],
+  ['random', 'randomColor'],
+  ['white', 'asWhite'],
+];
 
 export function replay(ctrl: Controller): MaybeVNode {
   const replay = ctrl.getData().replay;
@@ -183,7 +187,7 @@ export function replay(ctrl: Controller): MaybeVNode {
           href: `/training/dashboard/${replay.days}`,
         },
       },
-      ['« ', `Replaying ${ctrl.trans.noarg(ctrl.getData().theme.key)} puzzles`]
+      ['« ', `Replaying ${ctrl.trans.noarg(ctrl.getData().angle.key)} puzzles`]
     ),
     h('div.puzzle__side__replay__bar', {
       attrs: {
@@ -220,7 +224,7 @@ export function config(ctrl: Controller): MaybeVNode {
       ]),
       h('label', { attrs: { for: autoNextId } }, noarg('jumpToNextPuzzleImmediately')),
     ]),
-    !data.replay && !ctrl.streak && ctrl.difficulty ? renderDifficultyForm(ctrl) : null,
+    data.replay || ctrl.streak ? null : renderDifficultyForm(ctrl),
     h('div.puzzle__side__config__toggles', [
       h(
         'a.puzzle__side__config__zen.button.button-empty',
@@ -247,12 +251,12 @@ export function config(ctrl: Controller): MaybeVNode {
   ]);
 }
 
-export function renderDifficultyForm(ctrl: Controller): VNode {
-  return h(
+export const renderDifficultyForm = (ctrl: Controller): VNode =>
+  h(
     'form.puzzle__side__config__difficulty',
     {
       attrs: {
-        action: `/training/difficulty/${ctrl.getData().theme.key}`,
+        action: `/training/difficulty/${ctrl.getData().angle.key}`,
         method: 'post',
       },
     },
@@ -276,7 +280,7 @@ export function renderDifficultyForm(ctrl: Controller): VNode {
             {
               attrs: {
                 value: key,
-                selected: key == ctrl.difficulty,
+                selected: key == ctrl.settings.difficulty,
                 title:
                   !!delta &&
                   ctrl.trans.plural(
@@ -291,4 +295,25 @@ export function renderDifficultyForm(ctrl: Controller): VNode {
       ),
     ]
   );
-}
+
+export const renderColorForm = (ctrl: Controller): VNode =>
+  h(
+    'div.puzzle__side__config__color',
+    h(
+      'group.radio',
+      colors.map(([key, i18n]) =>
+        h('div', [
+          h(
+            `a.label.color-${key}${key === (ctrl.settings.color || 'random') ? '.active' : ''}`,
+            {
+              attrs: {
+                href: `/training/${ctrl.getData().angle.key}/${key}`,
+                title: ctrl.trans.noarg(i18n),
+              },
+            },
+            h('i')
+          ),
+        ])
+      )
+    )
+  );

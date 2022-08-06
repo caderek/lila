@@ -59,7 +59,6 @@ package report {
 
 package security {
   case class GarbageCollect(userId: String)
-  case class GCImmediateSb(userId: String)
   case class CloseAccount(userId: String)
   case class DeletePublicChats(userId: String)
 }
@@ -112,6 +111,11 @@ package captcha {
   case object AnyCaptcha
   case class GetCaptcha(id: String)
   case class ValidCaptcha(id: String, solution: String)
+}
+
+package lpv {
+  case class GamePgnsFromText(text: String, promise: Promise[Map[String, String]])
+  case class LpvLinkRenderFromText(text: String, promise: Promise[lila.base.RawHtml.LinkRender])
 }
 
 package simul {
@@ -224,6 +228,7 @@ package team {
   case class IsLeader(id: String, userId: String, promise: Promise[Boolean])
   case class IsLeaderOf(leaderId: String, memberId: String, promise: Promise[Boolean])
   case class KickFromTeam(teamId: String, userId: String)
+  case class LeaveTeam(teamId: String, userId: String)
   case class TeamIdsJoinedBy(userId: String, promise: Promise[List[LightTeam.TeamID]])
 }
 
@@ -275,7 +280,7 @@ package round {
   case class TourStanding(tourId: String, data: JsArray)
   case class FishnetPlay(uci: Uci, ply: Int)
   case object FishnetStart
-  case class BotPlay(playerId: String, uci: Uci, promise: Option[scala.concurrent.Promise[Unit]] = None)
+  case class BotPlay(playerId: String, uci: Uci, promise: Option[Promise[Unit]] = None)
   case class RematchOffer(gameId: String)
   case class RematchCancel(gameId: String)
   case class RematchYes(playerId: String)
@@ -315,5 +320,5 @@ package plan {
 }
 
 package push {
-  case class TourSoon(tourId: String, tourName: String, userIds: List[String], swiss: Boolean)
+  case class TourSoon(tourId: String, tourName: String, userIds: Iterable[String], swiss: Boolean)
 }

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="preferences">Indstillinger</string>
-  <string name="gameDisplay">Skakspillets udseende</string>
+  <string name="display">Udseende</string>
+  <string name="privacy">Privatliv</string>
   <string name="pieceAnimation">Animation af brikkerne</string>
   <string name="materialDifference">Materialeforskel</string>
   <string name="boardHighlights">Fremhævninger på brættet (af sidste træk og skak)</string>
@@ -35,7 +36,7 @@
   <string name="explainPromoteToQueenAutomatically">Hold &lt;ctrl&gt;-tasten nede, mens du forfremmer for midlertidigt at deaktivere auto-forfremmelse</string>
   <string name="whenPremoving">Ved forhåndstræk</string>
   <string name="claimDrawOnThreefoldRepetitionAutomatically">Kræv automatisk remis ved trækgentagelse</string>
-  <string name="whenTimeRemainingLessThanThirtySeconds">Når tilbageværende tid &lt; 30 sekunder</string>
+  <string name="whenTimeRemainingLessThanThirtySeconds" comment="whenTimeRemainingLessThanThirtySeconds&#10;&amp;lt; becomes &lt;.&#10;The &amp;lt; symbol is not required (you can write it as 'less than' in words), just do NOT use &lt; in its place.">Når tilbageværende tid &lt; 30 sekunder</string>
   <string name="moveConfirmation">Bekræft træk</string>
   <string name="inCorrespondenceGames">I korrespondancepartier</string>
   <string name="correspondenceAndUnlimited">Korrespondance og ubegrænset</string>
